@@ -43,7 +43,7 @@ function App() {
 
         try {
             if (selectedUser) {
-                await editUser(selectedUser, formData);
+                await editUser(selectedUser.id, formData);
                 setMessage({ type: "success", text: "User updated successfully." });
             } else {
                 await addUser(formData);

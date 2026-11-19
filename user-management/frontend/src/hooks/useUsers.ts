@@ -4,17 +4,13 @@ import {
     createUser,
     getErrorMessage,
     getUsers,
-    toPayload,
     updateUser,
 } from "../services/userService";
-import { getSavedUsers, saveUsers } from "../services/userStorage";
 import type { LoadStatus, User, UserFormData } from "../types/user";
 
 function useUsers() {
-    const [users, setUsers] = useState<User[]>(getSavedUsers);
-    const [loadStatus, setLoadStatus] = useState<LoadStatus>(
-        users.length > 0 ? "success" : "loading"
-    );
+    const [users, setUsers] = useState<User[]>([]);
+    const [loadStatus, setLoadStatus] = useState<LoadStatus>("loading");
     const [errorMessage, setErrorMessage] = useState("");
 
     useEffect(() => {
@@ -33,12 +29,6 @@ function useUsers() {
             });
     }, [loadStatus]);
 
-    useEffect(() => {
-        if (users.length > 0) {
-            saveUsers(users);
-        }
-    }, [users]);
-
     const reloadUsers = () => {
         setLoadStatus("loading");
     };
@@ -46,39 +36,17 @@ function useUsers() {
     const addUser = async (formData: UserFormData): Promise<void> => {
         const createdUser = await createUser(formData);
 
-        setUsers((prev) => [
-            ...prev,
-            {
-                ...createdUser,
-                id:
-                    prev.length > 0
-                        ? Math.max(...prev.map((user) => user.id)) + 1
-                        : 1,
-                isLocal: true,
-            },
-        ]);
+        setUsers((prev) => [...prev, createdUser]);
     };
 
     const editUser = async (
-        selectedUser: User,
+        id: number,
         formData: UserFormData
     ): Promise<void> => {
-        let updatedUser: User;
-
-        if (selectedUser.isLocal) {
-            updatedUser = {
-                ...toPayload(formData),
-                id: selectedUser.id,
-                isLocal: true,
-            };
-        } else {
-            updatedUser = await updateUser(selectedUser.id, formData);
-        }
+        const updatedUser = await updateUser(id, formData);
 
         setUsers((prev) =>
-            prev.map((user) =>
-                user.id === selectedUser.id ? updatedUser : user
-            )
+            prev.map((user) => (user.id === id ? updatedUser : user))
         );
     };
 
