@@ -10,7 +10,7 @@ function Counter() {
             <button onClick={() => setCount(Math.max(0, count - 1))}>
                 decrement
             </button>
-            <button onClick={() => setCount(count + 1)}>
+            <button onClick={() => setCount((prev) => prev + 1)}>
                 Counter
             </button>
             <button onClick={() => setCount(0)}>
