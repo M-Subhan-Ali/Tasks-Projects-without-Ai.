@@ -48,11 +48,12 @@ app.add_middleware(
 @app.exception_handler(RequestValidationError)
 def validation_error_handler(request: Request, error: RequestValidationError) -> JSONResponse:
     first_error = error.errors()[0]
-    field = first_error["loc"][-1]
+    field = ".".join(str(part) for part in first_error["loc"][1:])
+    message = first_error["msg"].removeprefix("Value error, ")
 
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
-        content={"detail": f"{field}: {first_error['msg']}"},
+        content={"detail": f"{field}: {message}"},
     )
 
 

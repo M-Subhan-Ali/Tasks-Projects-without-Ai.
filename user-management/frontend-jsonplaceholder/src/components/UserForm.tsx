@@ -18,6 +18,10 @@ const initialFormData: UserFormData = {
     company: "",
 };
 
+const NAME_PATTERN = /^[A-Za-z\s.'-]+$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_PATTERN = /^\+?[0-9\s()-]+$/;
+
 function getInitialFormData(user?: User): UserFormData {
     if (!user) {
         return initialFormData;
@@ -54,26 +58,40 @@ function UserForm({
     const validateForm = () => {
         const newErrors: FormErrors = {};
 
-        if (!formData.name.trim()) {
+        const name = formData.name.trim();
+        const email = formData.email.trim();
+        const phone = formData.phone.trim();
+        const company = formData.company.trim();
+        const phoneDigits = phone.replace(/\D/g, "");
+
+        if (!name) {
             newErrors.name = "Name is required";
+        } else if (name.length < 2) {
+            newErrors.name = "Name must be at least 2 characters";
+        } else if (!NAME_PATTERN.test(name)) {
+            newErrors.name = "Name can only contain letters, spaces, . ' -";
         }
 
-        if (!formData.email.trim()) {
+        if (!email) {
             newErrors.email = "Email is required";
-        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+        } else if (!EMAIL_PATTERN.test(email)) {
             newErrors.email = "Please enter a valid email";
-        } else if (
-            existingEmails.includes(formData.email.trim().toLowerCase())
-        ) {
+        } else if (existingEmails.includes(email.toLowerCase())) {
             newErrors.email = "This email already exists";
         }
 
-        if (!formData.phone.trim()) {
+        if (!phone) {
             newErrors.phone = "Phone number is required";
+        } else if (!PHONE_PATTERN.test(phone)) {
+            newErrors.phone = "Phone number can only contain digits, spaces, + - ( )";
+        } else if (phoneDigits.length < 7 || phoneDigits.length > 15) {
+            newErrors.phone = "Phone number must have 7 to 15 digits";
         }
 
-        if (!formData.company.trim()) {
+        if (!company) {
             newErrors.company = "Company name is required";
+        } else if (company.length < 2) {
+            newErrors.company = "Company name must be at least 2 characters";
         }
 
         setErrors(newErrors);
@@ -106,6 +124,7 @@ function UserForm({
                 <input
                     type="text"
                     placeholder="Enter name"
+                    maxLength={100}
                     value={formData.name}
                     onChange={(e) => handleChange("name", e.target.value)}
                 />
@@ -119,6 +138,7 @@ function UserForm({
                 <input
                     type="email"
                     placeholder="Enter email"
+                    maxLength={100}
                     value={formData.email}
                     onChange={(e) => handleChange("email", e.target.value)}
                 />
@@ -130,8 +150,9 @@ function UserForm({
                 <label>Phone</label>
 
                 <input
-                    type="text"
-                    placeholder="Enter phone number"
+                    type="tel"
+                    placeholder="e.g. 0300-1234567"
+                    maxLength={20}
                     value={formData.phone}
                     onChange={(e) => handleChange("phone", e.target.value)}
                 />
@@ -145,6 +166,7 @@ function UserForm({
                 <input
                     type="text"
                     placeholder="Enter company name"
+                    maxLength={100}
                     value={formData.company}
                     onChange={(e) => handleChange("company", e.target.value)}
                 />

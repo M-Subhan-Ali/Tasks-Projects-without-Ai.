@@ -8,10 +8,13 @@ export interface User {
     email: string;
     phone: string;
     company: Company;
-    isLocal?: boolean;
 }
 
-export type UserPayload = Omit<User, "id" | "isLocal">;
+export type UserPayload = Omit<User, "id">;
+
+export interface ApiErrorResponse {
+    detail?: string;
+}
 
 export interface UserFormData {
     name: string;

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import User
-from app.schemas import Company, UserCreate, UserResponse
+from app.schemas import CompanyResponse, UserCreate, UserResponse
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -15,7 +15,7 @@ def to_response(user: User) -> UserResponse:
         name=user.name,
         email=user.email,
         phone=user.phone,
-        company=Company(name=user.company_name),
+        company=CompanyResponse(name=user.company_name),
     )
 
 

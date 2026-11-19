@@ -1,6 +1,11 @@
-import type { User, UserFormData, UserPayload } from "../types/user";
+import type {
+    ApiErrorResponse,
+    User,
+    UserFormData,
+    UserPayload,
+} from "../types/user";
 
-const USERS_URL = "https://jsonplaceholder.typicode.com/users";
+const USERS_URL = `${import.meta.env.VITE_API_URL}/users`;
 
 export class ApiError extends Error {
     status: number;
@@ -29,18 +34,34 @@ function getStatusMessage(status: number): string {
     }
 }
 
+async function getResponseErrorMessage(response: Response): Promise<string> {
+    try {
+        const data = (await response.json()) as ApiErrorResponse;
+
+        if (typeof data.detail === "string") {
+            return data.detail;
+        }
+    } catch {
+        return getStatusMessage(response.status);
+    }
+
+    return getStatusMessage(response.status);
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
     let response: Response;
 
     try {
         response = await fetch(url, options);
     } catch {
-        throw new Error("Network error. Please check your internet connection.");
+        throw new Error(
+            "Cannot connect to the server. Please make sure the backend is running."
+        );
     }
 
     if (!response.ok) {
         throw new ApiError(
-            `${getStatusMessage(response.status)} (Status: ${response.status})`,
+            await getResponseErrorMessage(response),
             response.status
         );
     }
@@ -48,7 +69,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     return (await response.json()) as T;
 }
 
-export function toPayload(formData: UserFormData): UserPayload {
+function toPayload(formData: UserFormData): UserPayload {
     return {
         name: formData.name,
         email: formData.email,
@@ -76,7 +97,7 @@ export function updateUser(
     return request<User>(`${USERS_URL}/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, ...toPayload(formData) }),
+        body: JSON.stringify(toPayload(formData)),
     });
 }
 
