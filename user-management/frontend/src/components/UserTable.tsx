@@ -7,10 +7,18 @@ import SearchInput from "./SearchInput";
 interface UserTableProps {
     users: User[];
     onEdit: (user: User) => void;
+    onDelete: (user: User) => void;
+    deletingUserId?: number;
     recordsPerPage?: number;
 }
 
-function UserTable({ users, onEdit, recordsPerPage = 5 }: UserTableProps) {
+function UserTable({
+    users,
+    onEdit,
+    onDelete,
+    deletingUserId,
+    recordsPerPage = 5,
+}: UserTableProps) {
     const [search, setSearch] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -24,7 +32,11 @@ function UserTable({ users, onEdit, recordsPerPage = 5 }: UserTableProps) {
 
     const totalPages = Math.ceil(filteredUsers.length / recordsPerPage);
 
-    const startIndex = (currentPage - 1) * recordsPerPage;
+    // Keep the page in range when rows are removed (e.g. deleting the last
+    // user on the last page).
+    const page = Math.min(currentPage, Math.max(totalPages, 1));
+
+    const startIndex = (page - 1) * recordsPerPage;
 
     const currentUsers = filteredUsers.slice(
         startIndex,
@@ -56,6 +68,7 @@ function UserTable({ users, onEdit, recordsPerPage = 5 }: UserTableProps) {
                                 <th>Name</th>
                                 <th>Email</th>
                                 <th>Phone</th>
+                                <th>City</th>
                                 <th>Company</th>
                                 <th>Actions</th>
                             </tr>
@@ -67,10 +80,23 @@ function UserTable({ users, onEdit, recordsPerPage = 5 }: UserTableProps) {
                                     <td>{user.name}</td>
                                     <td>{user.email}</td>
                                     <td>{user.phone}</td>
+                                    <td>{user.city}</td>
                                     <td>{user.company.name}</td>
                                     <td>
-                                        <button onClick={() => onEdit(user)}>
+                                        <button
+                                            onClick={() => onEdit(user)}
+                                            disabled={deletingUserId === user.id}
+                                        >
                                             Edit
+                                        </button>
+
+                                        <button
+                                            onClick={() => onDelete(user)}
+                                            disabled={deletingUserId === user.id}
+                                        >
+                                            {deletingUserId === user.id
+                                                ? "Deleting..."
+                                                : "Delete"}
                                         </button>
                                     </td>
                                 </tr>
@@ -79,7 +105,7 @@ function UserTable({ users, onEdit, recordsPerPage = 5 }: UserTableProps) {
                     </table>
 
                     <Pagination
-                        currentPage={currentPage}
+                        currentPage={page}
                         totalPages={totalPages}
                         onPageChange={setCurrentPage}
                     />

@@ -15,12 +15,14 @@ const initialFormData: UserFormData = {
     name: "",
     email: "",
     phone: "",
+    city: "",
     company: "",
 };
 
 const NAME_PATTERN = /^[A-Za-z\s.'-]+$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_PATTERN = /^\+?[0-9\s()-]+$/;
+const PHONE_DISALLOWED_CHARS = /[^0-9\s()+-]/g;
 
 function getInitialFormData(user?: User): UserFormData {
     if (!user) {
@@ -31,6 +33,7 @@ function getInitialFormData(user?: User): UserFormData {
         name: user.name,
         email: user.email,
         phone: user.phone,
+        city: user.city,
         company: user.company.name,
     };
 }
@@ -61,6 +64,7 @@ function UserForm({
         const name = formData.name.trim();
         const email = formData.email.trim();
         const phone = formData.phone.trim();
+        const city = formData.city.trim();
         const company = formData.company.trim();
         const phoneDigits = phone.replace(/\D/g, "");
 
@@ -88,6 +92,14 @@ function UserForm({
             newErrors.phone = "Phone number must have 7 to 15 digits";
         }
 
+        if (!city) {
+            newErrors.city = "City is required";
+        } else if (city.length < 2) {
+            newErrors.city = "City must be at least 2 characters";
+        } else if (!NAME_PATTERN.test(city)) {
+            newErrors.city = "City can only contain letters, spaces, . ' -";
+        }
+
         if (!company) {
             newErrors.company = "Company name is required";
         } else if (company.length < 2) {
@@ -110,6 +122,7 @@ function UserForm({
             name: formData.name.trim(),
             email: formData.email.trim(),
             phone: formData.phone.trim(),
+            city: formData.city.trim(),
             company: formData.company.trim(),
         });
     };
@@ -151,13 +164,33 @@ function UserForm({
 
                 <input
                     type="tel"
+                    inputMode="tel"
                     placeholder="e.g. 0300-1234567"
                     maxLength={20}
                     value={formData.phone}
-                    onChange={(e) => handleChange("phone", e.target.value)}
+                    onChange={(e) =>
+                        handleChange(
+                            "phone",
+                            e.target.value.replace(PHONE_DISALLOWED_CHARS, "")
+                        )
+                    }
                 />
 
                 {errors.phone && <span className="error-text">{errors.phone}</span>}
+            </div>
+
+            <div>
+                <label>City</label>
+
+                <input
+                    type="text"
+                    placeholder="Enter city"
+                    maxLength={100}
+                    value={formData.city}
+                    onChange={(e) => handleChange("city", e.target.value)}
+                />
+
+                {errors.city && <span className="error-text">{errors.city}</span>}
             </div>
 
             <div>
@@ -181,8 +214,8 @@ function UserForm({
                     {isSubmitting
                         ? "Saving..."
                         : user
-                          ? "Update User"
-                          : "Add User"}
+                            ? "Update User"
+                            : "Add User"}
                 </button>
 
                 <button type="button" onClick={onCancel} disabled={isSubmitting}>

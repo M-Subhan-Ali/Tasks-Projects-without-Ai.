@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -15,6 +17,7 @@ def to_response(user: User) -> UserResponse:
         name=user.name,
         email=user.email,
         phone=user.phone,
+        city=user.city,
         company=CompanyResponse(name=user.company_name),
     )
 
@@ -22,7 +25,7 @@ def to_response(user: User) -> UserResponse:
 def get_user_or_404(db: Session, user_id: int) -> User:
     user = db.get(User, user_id)
 
-    if user is None:
+    if user is None or user.is_deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
@@ -32,6 +35,7 @@ def get_user_or_404(db: Session, user_id: int) -> User:
 
 
 def check_email_available(db: Session, email: str, user_id: int | None = None) -> None:
+
     query = select(User).where(func.lower(User.email) == email.lower())
 
     if user_id is not None:
@@ -46,7 +50,7 @@ def check_email_available(db: Session, email: str, user_id: int | None = None) -
 
 @router.get("", response_model=list[UserResponse])
 def get_users(db: Session = Depends(get_db)) -> list[UserResponse]:
-    users = db.scalars(select(User).order_by(User.id)).all()
+    users = db.scalars(select(User).where(User.is_deleted.is_(False)).order_by(User.id)).all()
 
     return [to_response(user) for user in users]
 
@@ -64,6 +68,7 @@ def create_user(user_data: UserCreate, db: Session = Depends(get_db)) -> UserRes
         name=user_data.name,
         email=user_data.email,
         phone=user_data.phone,
+        city=user_data.city,
         company_name=user_data.company.name,
     )
 
@@ -87,9 +92,22 @@ def update_user(
     user.name = user_data.name
     user.email = user_data.email
     user.phone = user_data.phone
+    user.city = user_data.city
     user.company_name = user_data.company.name
 
     db.commit()
     db.refresh(user)
 
     return to_response(user)
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(user_id: int, db: Session = Depends(get_db)) -> Response:
+    user = get_user_or_404(db, user_id)
+
+    user.is_deleted = True
+    user.deleted_at = datetime.now(timezone.utc)
+
+    db.commit()
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

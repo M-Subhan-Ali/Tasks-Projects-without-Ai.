@@ -7,6 +7,7 @@ export interface User {
     name: string;
     email: string;
     phone: string;
+    city: string;
     company: Company;
 }
 
@@ -20,6 +21,7 @@ export interface UserFormData {
     name: string;
     email: string;
     phone: string;
+    city: string;
     company: string;
 }
 
