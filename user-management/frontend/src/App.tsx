@@ -8,12 +8,20 @@ import { getErrorMessage } from "./services/userService";
 import type { StatusMessage, User, UserFormData } from "./types/user";
 
 function App() {
-    const { users, loadStatus, errorMessage, reloadUsers, addUser, editUser } =
-        useUsers();
+    const {
+        users,
+        loadStatus,
+        errorMessage,
+        reloadUsers,
+        addUser,
+        editUser,
+        removeUser,
+    } = useUsers();
 
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedUser, setSelectedUser] = useState<User>();
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [deletingUserId, setDeletingUserId] = useState<number>();
     const [message, setMessage] = useState<StatusMessage>();
 
     const existingEmails = users
@@ -58,6 +66,29 @@ function App() {
         }
     };
 
+    const handleDelete = async (user: User) => {
+        if (!window.confirm(`Are you sure you want to delete ${user.name}?`)) {
+            return;
+        }
+
+        setDeletingUserId(user.id);
+        setMessage(undefined);
+
+        try {
+            await removeUser(user.id);
+
+            if (selectedUser?.id === user.id) {
+                handleCancel();
+            }
+
+            setMessage({ type: "success", text: "User deleted successfully." });
+        } catch (error: unknown) {
+            setMessage({ type: "error", text: getErrorMessage(error) });
+        } finally {
+            setDeletingUserId(undefined);
+        }
+    };
+
     return (
         <div className="container">
             <h1>User Management</h1>
@@ -96,7 +127,12 @@ function App() {
                     {users.length === 0 ? (
                         <p>No users found. Click "Add User" to create one.</p>
                     ) : (
-                        <UserTable users={users} onEdit={handleEdit} />
+                        <UserTable
+                            users={users}
+                            onEdit={handleEdit}
+                            onDelete={handleDelete}
+                            deletingUserId={deletingUserId}
+                        />
                     )}
                 </>
             )}

@@ -66,6 +66,10 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
         );
     }
 
+    if (response.status === 204) {
+        return undefined as T;
+    }
+
     return (await response.json()) as T;
 }
 
@@ -74,6 +78,7 @@ function toPayload(formData: UserFormData): UserPayload {
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
+        city: formData.city,
         company: { name: formData.company },
     };
 }
@@ -99,6 +104,10 @@ export function updateUser(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(toPayload(formData)),
     });
+}
+
+export function deleteUser(id: number): Promise<void> {
+    return request<void>(`${USERS_URL}/${id}`, { method: "DELETE" });
 }
 
 export function getErrorMessage(error: unknown): string {

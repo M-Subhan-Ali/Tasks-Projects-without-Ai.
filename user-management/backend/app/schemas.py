@@ -18,6 +18,7 @@ class UserCreate(BaseModel):
     name: str = Field(min_length=2, max_length=100)
     email: EmailStr
     phone: str = Field(min_length=1, max_length=20)
+    city: str = Field(min_length=2, max_length=100)
     company: Company
 
     @field_validator("name")
@@ -25,6 +26,14 @@ class UserCreate(BaseModel):
     def validate_name(cls, value: str) -> str:
         if not re.fullmatch(NAME_PATTERN, value):
             raise ValueError("Name can only contain letters, spaces, . ' -")
+
+        return value
+
+    @field_validator("city")
+    @classmethod
+    def validate_city(cls, value: str) -> str:
+        if not re.fullmatch(NAME_PATTERN, value):
+            raise ValueError("City can only contain letters. ' -")
 
         return value
 
@@ -59,4 +68,5 @@ class UserResponse(BaseModel):
     name: str
     email: str
     phone: str
+    city: str
     company: CompanyResponse

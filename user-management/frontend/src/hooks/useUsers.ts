@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import {
     createUser,
+    deleteUser,
     getErrorMessage,
     getUsers,
     updateUser,
@@ -50,6 +51,12 @@ function useUsers() {
         );
     };
 
+    const removeUser = async (id: number): Promise<void> => {
+        await deleteUser(id);
+
+        setUsers((prev) => prev.filter((user) => user.id !== id));
+    };
+
     return {
         users,
         loadStatus,
@@ -57,6 +64,7 @@ function useUsers() {
         reloadUsers,
         addUser,
         editUser,
+        removeUser,
     };
 }
 
