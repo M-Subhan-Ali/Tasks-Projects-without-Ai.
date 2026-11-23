@@ -4,7 +4,9 @@ This layer knows nothing about HTTP: it never imports FastAPI and never raises
 HTTPException. It raises application exceptions from app.exceptions instead.
 """
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import Any
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -12,11 +14,24 @@ from sqlalchemy.orm import Session
 from app.exceptions import EmailAlreadyExists, UserNotFound
 from app.models import User
 from app.repositories import user_repository
-from app.schemas import UserCreate
+from app.schemas import UserCreate, UserUpdate
 
 
-def list_users(db: Session) -> list[User]:
-    return user_repository.get_active_users(db)
+@dataclass(frozen=True)
+class UserPage:
+    users: list[User]
+    total: int
+    page: int
+    limit: int
+
+
+def list_users(db: Session, search: str | None, page: int, limit: int) -> UserPage:
+    search_text = search.strip() if search else None
+    offset = (page - 1) * limit
+
+    users, total = user_repository.search_active_users(db, search_text, offset, limit)
+
+    return UserPage(users=users, total=total, page=page, limit=limit)
 
 
 def get_user(db: Session, user_id: int) -> User:
@@ -31,13 +46,7 @@ def get_user(db: Session, user_id: int) -> User:
 def create_user(db: Session, user_data: UserCreate) -> User:
     _ensure_email_available(db, user_data.email)
 
-    user = User(
-        name=user_data.name,
-        email=user_data.email,
-        phone=user_data.phone,
-        city=user_data.city,
-        company_name=user_data.company.name,
-    )
+    user = User(**_to_column_values(user_data.model_dump()))
 
     try:
         return user_repository.add_user(db, user)
@@ -47,20 +56,13 @@ def create_user(db: Session, user_data: UserCreate) -> User:
 
 
 def replace_user(db: Session, user_id: int, user_data: UserCreate) -> User:
-    user = get_user(db, user_id)
-    _ensure_email_available(db, user_data.email, exclude_user_id=user_id)
+    """PUT: overwrite every field."""
+    return _apply_changes(db, user_id, user_data.model_dump())
 
-    user.name = user_data.name
-    user.email = user_data.email
-    user.phone = user_data.phone
-    user.city = user_data.city
-    user.company_name = user_data.company.name
 
-    try:
-        return user_repository.save_user(db, user)
-    except IntegrityError as error:
-        _raise_if_duplicate_email(error, user_data.email)
-        raise
+def update_user(db: Session, user_id: int, user_data: UserUpdate) -> User:
+    """PATCH: change only the fields the client actually sent."""
+    return _apply_changes(db, user_id, user_data.model_dump(exclude_unset=True))
 
 
 def delete_user(db: Session, user_id: int) -> None:
@@ -70,6 +72,33 @@ def delete_user(db: Session, user_id: int) -> None:
     user.deleted_at = datetime.now(timezone.utc)
 
     user_repository.save_user(db, user)
+
+
+def _apply_changes(db: Session, user_id: int, changes: dict[str, Any]) -> User:
+    user = get_user(db, user_id)
+
+    new_email = changes.get("email")
+    if new_email is not None:
+        _ensure_email_available(db, new_email, exclude_user_id=user_id)
+
+    for column, value in _to_column_values(changes).items():
+        setattr(user, column, value)
+
+    try:
+        return user_repository.save_user(db, user)
+    except IntegrityError as error:
+        _raise_if_duplicate_email(error, new_email or user.email)
+        raise
+
+
+def _to_column_values(data: dict[str, Any]) -> dict[str, Any]:
+    """Map the API shape ({"company": {"name": ...}}) to the table columns."""
+    values = dict(data)
+
+    if "company" in values:
+        values["company_name"] = values.pop("company")["name"]
+
+    return values
 
 
 def _ensure_email_available(

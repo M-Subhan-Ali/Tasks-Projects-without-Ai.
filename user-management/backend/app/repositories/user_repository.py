@@ -1,15 +1,30 @@
 """Database access for users. SQLAlchemy queries live here and nowhere else."""
 
-from sqlalchemy import func, select
+from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import User
 
 
-def get_active_users(db: Session) -> list[User]:
-    query = select(User).where(User.is_deleted.is_(False)).order_by(User.id)
-    return list(db.scalars(query).all())
+def search_active_users(
+    db: Session, search: str | None, offset: int, limit: int
+) -> tuple[list[User], int]:
+    """Return one page of matching users plus the total number of matches.
+
+    Filtering, counting and paging all happen in SQL, so only `limit` rows
+    are ever loaded into Python.
+    """
+    filters = _active_user_filters(search)
+
+    total = db.scalar(select(func.count()).select_from(User).where(*filters)) or 0
+
+    page_query = (
+        select(User).where(*filters).order_by(User.id).offset(offset).limit(limit)
+    )
+    users = list(db.scalars(page_query).all())
+
+    return users, total
 
 
 def get_active_user_by_id(db: Session, user_id: int) -> User | None:
@@ -37,6 +52,26 @@ def add_user(db: Session, user: User) -> User:
 
 def save_user(db: Session, user: User) -> User:
     return _commit_and_refresh(db, user)
+
+
+def _active_user_filters(search: str | None) -> list[ColumnElement[bool]]:
+    filters: list[ColumnElement[bool]] = [User.is_deleted.is_(False)]
+
+    if search:
+        pattern = f"%{_escape_like(search)}%"
+        filters.append(
+            or_(
+                User.name.ilike(pattern, escape="\\"),
+                User.email.ilike(pattern, escape="\\"),
+            )
+        )
+
+    return filters
+
+
+def _escape_like(text: str) -> str:
+    """Make % and _ in the search text match literally instead of as wildcards."""
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def _commit_and_refresh(db: Session, user: User) -> User:

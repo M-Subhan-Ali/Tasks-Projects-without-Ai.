@@ -2,7 +2,9 @@ import type {
     ApiErrorResponse,
     User,
     UserFormData,
+    UserListResponse,
     UserPayload,
+    UserQuery,
 } from "../types/user";
 
 const USERS_URL = `${import.meta.env.VITE_API_URL}/users`;
@@ -93,8 +95,17 @@ function toPayload(formData: UserFormData): UserPayload {
     };
 }
 
-export function getUsers(): Promise<User[]> {
-    return request<User[]>(USERS_URL);
+export function getUsers(query: UserQuery): Promise<UserListResponse> {
+    const params = new URLSearchParams({
+        page: String(query.page),
+        limit: String(query.limit),
+    });
+
+    if (query.search) {
+        params.set("search", query.search);
+    }
+
+    return request<UserListResponse>(`${USERS_URL}?${params.toString()}`);
 }
 
 export function createUser(formData: UserFormData): Promise<User> {

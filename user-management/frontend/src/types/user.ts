@@ -13,6 +13,19 @@ export interface User {
 
 export type UserPayload = Omit<User, "id">;
 
+export interface UserListResponse {
+    items: User[];
+    total: number;
+    page: number;
+    limit: number;
+}
+
+export interface UserQuery {
+    search: string;
+    page: number;
+    limit: number;
+}
+
 export interface FieldError {
     field: string;
     message: string;
