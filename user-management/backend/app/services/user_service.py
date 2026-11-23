@@ -6,6 +6,7 @@ HTTPException. It raises application exceptions from app.exceptions instead.
 
 from datetime import datetime, timezone
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.exceptions import EmailAlreadyExists, UserNotFound
@@ -38,7 +39,11 @@ def create_user(db: Session, user_data: UserCreate) -> User:
         company_name=user_data.company.name,
     )
 
-    return user_repository.add_user(db, user)
+    try:
+        return user_repository.add_user(db, user)
+    except IntegrityError as error:
+        _raise_if_duplicate_email(error, user_data.email)
+        raise
 
 
 def replace_user(db: Session, user_id: int, user_data: UserCreate) -> User:
@@ -51,7 +56,11 @@ def replace_user(db: Session, user_id: int, user_data: UserCreate) -> User:
     user.city = user_data.city
     user.company_name = user_data.company.name
 
-    return user_repository.save_user(db, user)
+    try:
+        return user_repository.save_user(db, user)
+    except IntegrityError as error:
+        _raise_if_duplicate_email(error, user_data.email)
+        raise
 
 
 def delete_user(db: Session, user_id: int) -> None:
@@ -68,3 +77,14 @@ def _ensure_email_available(
 ) -> None:
     if user_repository.email_exists(db, email, exclude_user_id):
         raise EmailAlreadyExists(email)
+
+
+def _raise_if_duplicate_email(error: IntegrityError, email: str) -> None:
+    """Handle the race where two requests both pass the email check.
+
+    The database UNIQUE constraint is the final guard. If it was the email
+    constraint that failed, report it as a normal duplicate (409). Any other
+    integrity error is unexpected, so the caller re-raises it (500).
+    """
+    if "users.email" in str(error.orig):
+        raise EmailAlreadyExists(email) from error

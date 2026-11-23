@@ -1,6 +1,7 @@
 """Database access for users. SQLAlchemy queries live here and nowhere else."""
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import User
@@ -31,12 +32,24 @@ def email_exists(db: Session, email: str, exclude_user_id: int | None = None) ->
 
 def add_user(db: Session, user: User) -> User:
     db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
+    return _commit_and_refresh(db, user)
 
 
 def save_user(db: Session, user: User) -> User:
-    db.commit()
+    return _commit_and_refresh(db, user)
+
+
+def _commit_and_refresh(db: Session, user: User) -> User:
+    """Commit the session. On a constraint error, roll back and re-raise.
+
+    The rollback is required: after a failed commit the session is unusable
+    until it is rolled back.
+    """
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise
+
     db.refresh(user)
     return user

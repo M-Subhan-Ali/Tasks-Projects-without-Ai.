@@ -27,6 +27,10 @@ function getStatusMessage(status: number): string {
             return "Forbidden. You do not have permission for this action.";
         case 404:
             return "Requested resource was not found.";
+        case 409:
+            return "This conflicts with existing data.";
+        case 422:
+            return "Some fields are invalid. Please check the form.";
         case 500:
             return "Server error. Please try again later.";
         default:
@@ -37,6 +41,12 @@ function getStatusMessage(status: number): string {
 async function getResponseErrorMessage(response: Response): Promise<string> {
     try {
         const data = (await response.json()) as ApiErrorResponse;
+
+        if (data.errors && data.errors.length > 0) {
+            return data.errors
+                .map((error) => `${error.field}: ${error.message}`)
+                .join(" | ");
+        }
 
         if (typeof data.detail === "string") {
             return data.detail;
