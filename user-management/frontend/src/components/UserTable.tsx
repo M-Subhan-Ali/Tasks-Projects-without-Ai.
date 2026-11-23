@@ -1,65 +1,53 @@
-import { useState } from "react";
-
 import type { User } from "../types/user";
 import Pagination from "./Pagination";
 import SearchInput from "./SearchInput";
 
 interface UserTableProps {
     users: User[];
+    total: number;
+    page: number;
+    totalPages: number;
+    searchInput: string;
+    isSearching: boolean;
+    onSearchChange: (value: string) => void;
+    onPageChange: (page: number) => void;
     onEdit: (user: User) => void;
     onDelete: (user: User) => void;
     deletingUserId?: number;
-    recordsPerPage?: number;
 }
 
+// Presentational only: searching and paging happen on the server (see useUsers).
 function UserTable({
     users,
+    total,
+    page,
+    totalPages,
+    searchInput,
+    isSearching,
+    onSearchChange,
+    onPageChange,
     onEdit,
     onDelete,
     deletingUserId,
-    recordsPerPage = 5,
 }: UserTableProps) {
-    const [search, setSearch] = useState("");
-    const [currentPage, setCurrentPage] = useState(1);
-
-    const searchValue = search.trim().toLowerCase();
-
-    const filteredUsers = users.filter(
-        (user) =>
-            user.name.toLowerCase().includes(searchValue) ||
-            user.email.toLowerCase().includes(searchValue)
-    );
-
-    const totalPages = Math.ceil(filteredUsers.length / recordsPerPage);
-
-    // Keep the page in range when rows are removed (e.g. deleting the last
-    // user on the last page).
-    const page = Math.min(currentPage, Math.max(totalPages, 1));
-
-    const startIndex = (page - 1) * recordsPerPage;
-
-    const currentUsers = filteredUsers.slice(
-        startIndex,
-        startIndex + recordsPerPage
-    );
-
     return (
         <div>
             <h2>User List</h2>
 
             <SearchInput
-                value={search}
+                value={searchInput}
                 placeholder="Search by name or email..."
-                onChange={(value) => {
-                    setSearch(value);
-                    setCurrentPage(1);
-                }}
+                onChange={onSearchChange}
             />
 
-            <p>Total Records: {filteredUsers.length}</p>
+            <p>Total Records: {total}</p>
 
-            {filteredUsers.length === 0 ? (
-                <p>No matching users found.</p>
+            {users.length === 0 ? (
+                <p>
+                    {isSearching
+                        ? "No matching users found."
+                        : 'No users found. Click "Add User" to create one.'}
+                </p>
             ) : (
                 <>
                     <table>
@@ -75,7 +63,7 @@ function UserTable({
                         </thead>
 
                         <tbody>
-                            {currentUsers.map((user) => (
+                            {users.map((user) => (
                                 <tr key={user.id}>
                                     <td>{user.name}</td>
                                     <td>{user.email}</td>
@@ -107,7 +95,7 @@ function UserTable({
                     <Pagination
                         currentPage={page}
                         totalPages={totalPages}
-                        onPageChange={setCurrentPage}
+                        onPageChange={onPageChange}
                     />
                 </>
             )}

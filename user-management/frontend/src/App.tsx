@@ -10,9 +10,16 @@ import type { StatusMessage, User, UserFormData } from "./types/user";
 function App() {
     const {
         users,
+        total,
+        page,
+        totalPages,
+        searchInput,
+        isSearching,
         loadStatus,
         errorMessage,
-        reloadUsers,
+        retryLoad,
+        changeSearch,
+        setPage,
         addUser,
         editUser,
         removeUser,
@@ -24,6 +31,8 @@ function App() {
     const [deletingUserId, setDeletingUserId] = useState<number>();
     const [message, setMessage] = useState<StatusMessage>();
 
+    // Quick client-side hint only: it knows just the current page. The
+    // backend's 409 is the real duplicate check.
     const existingEmails = users
         .filter((user) => user.id !== selectedUser?.id)
         .map((user) => user.email.toLowerCase());
@@ -99,7 +108,7 @@ function App() {
                 <div>
                     <p className="message error">{errorMessage}</p>
 
-                    <button onClick={reloadUsers}>Retry</button>
+                    <button onClick={retryLoad}>Retry</button>
                 </div>
             )}
 
@@ -124,16 +133,19 @@ function App() {
                         />
                     )}
 
-                    {users.length === 0 ? (
-                        <p>No users found. Click "Add User" to create one.</p>
-                    ) : (
-                        <UserTable
-                            users={users}
-                            onEdit={handleEdit}
-                            onDelete={handleDelete}
-                            deletingUserId={deletingUserId}
-                        />
-                    )}
+                    <UserTable
+                        users={users}
+                        total={total}
+                        page={page}
+                        totalPages={totalPages}
+                        searchInput={searchInput}
+                        isSearching={isSearching}
+                        onSearchChange={changeSearch}
+                        onPageChange={setPage}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                        deletingUserId={deletingUserId}
+                    />
                 </>
             )}
         </div>
