@@ -13,8 +13,14 @@ export interface User {
 
 export type UserPayload = Omit<User, "id">;
 
+export interface FieldError {
+    field: string;
+    message: string;
+}
+
 export interface ApiErrorResponse {
     detail?: string;
+    errors?: FieldError[];
 }
 
 export interface UserFormData {

@@ -1,3 +1,4 @@
+import logging
 import os
 
 from fastapi import FastAPI, Request, status
@@ -7,7 +8,11 @@ from fastapi.responses import JSONResponse
 
 from app.database import Base, engine
 from app.exceptions import AppError, EmailAlreadyExists, UserNotFound
+from app.logging_config import configure_logging
 from app.routers import users
+
+configure_logging()
+logger = logging.getLogger(__name__)
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
@@ -38,16 +43,33 @@ def app_error_handler(request: Request, error: AppError) -> JSONResponse:
     return JSONResponse(status_code=status_code, content={"detail": error.message})
 
 
+def _format_validation_error(error: dict) -> dict[str, str]:
+    # loc looks like ("body", "company", "name") or ("path", "user_id").
+    # Drop the first part (where it came from) and join the rest.
+    field = ".".join(str(part) for part in error["loc"][1:]) or str(error["loc"][0])
+    message = error["msg"].removeprefix("Value error, ")
+    return {"field": field, "message": message}
+
+
 @app.exception_handler(RequestValidationError)
 def validation_error_handler(request: Request, error: RequestValidationError) -> JSONResponse:
-    # Phase 4 changes this to return 422 with ALL invalid fields.
-    first_error = error.errors()[0]
-    field = ".".join(str(part) for part in first_error["loc"][1:])
-    message = first_error["msg"].removeprefix("Value error, ")
-
+    """Return 422 listing EVERY invalid field, not just the first one."""
     return JSONResponse(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        content={"detail": f"{field}: {message}"},
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        content={
+            "detail": "Validation failed",
+            "errors": [_format_validation_error(item) for item in error.errors()],
+        },
+    )
+
+
+@app.exception_handler(Exception)
+def unexpected_error_handler(request: Request, error: Exception) -> JSONResponse:
+    """Last line of defence: log the real error, tell the client nothing internal."""
+    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": "Internal server error"},
     )
 
 

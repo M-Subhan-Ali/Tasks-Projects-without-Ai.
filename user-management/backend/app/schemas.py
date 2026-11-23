@@ -41,11 +41,12 @@ class UserCreate(BaseModel):
 
     @field_validator("email")
     @classmethod
-    def validate_email_length(cls, value: str) -> str:
+    def normalize_email(cls, value: str) -> str:
         if len(value) > 100:
             raise ValueError("Email must be at most 100 characters")
 
-        return value
+        # Lowercase so the database UNIQUE constraint is effectively case-insensitive.
+        return value.lower()
 
     @field_validator("phone")
     @classmethod
