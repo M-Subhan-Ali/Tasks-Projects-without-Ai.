@@ -2,6 +2,8 @@ import re
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
+from app.models import User
+
 NAME_PATTERN = r"^[A-Za-z\s.'-]+$"
 PHONE_PATTERN = r"^\+?[0-9\s()-]+$"
 
@@ -70,3 +72,15 @@ class UserResponse(BaseModel):
     phone: str
     city: str
     company: CompanyResponse
+
+    @classmethod
+    def from_model(cls, user: User) -> "UserResponse":
+        """Convert the flat database row into the nested API shape."""
+        return cls(
+            id=user.id,
+            name=user.name,
+            email=user.email,
+            phone=user.phone,
+            city=user.city,
+            company=CompanyResponse(name=user.company_name),
+        )
