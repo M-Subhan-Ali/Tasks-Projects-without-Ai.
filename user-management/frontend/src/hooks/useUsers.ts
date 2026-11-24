@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 
+import { getErrorMessage } from "../services/apiClient";
 import {
     createUser,
     deleteUser,
-    getErrorMessage,
     getUsers,
     updateUser,
 } from "../services/userService";

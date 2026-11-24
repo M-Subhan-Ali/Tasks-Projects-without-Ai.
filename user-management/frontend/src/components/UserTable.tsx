@@ -14,6 +14,8 @@ interface UserTableProps {
     onEdit: (user: User) => void;
     onDelete: (user: User) => void;
     deletingUserId?: number;
+    // Viewers get a read-only table: no Actions column.
+    canEdit: boolean;
 }
 
 // Presentational only: searching and paging happen on the server (see useUsers).
@@ -29,6 +31,7 @@ function UserTable({
     onEdit,
     onDelete,
     deletingUserId,
+    canEdit,
 }: UserTableProps) {
     return (
         <div>
@@ -46,7 +49,9 @@ function UserTable({
                 <p>
                     {isSearching
                         ? "No matching users found."
-                        : 'No users found. Click "Add User" to create one.'}
+                        : canEdit
+                          ? 'No users found. Click "Add User" to create one.'
+                          : "No users found."}
                 </p>
             ) : (
                 <>
@@ -58,7 +63,7 @@ function UserTable({
                                 <th>Phone</th>
                                 <th>City</th>
                                 <th>Company</th>
-                                <th>Actions</th>
+                                {canEdit && <th>Actions</th>}
                             </tr>
                         </thead>
 
@@ -70,23 +75,25 @@ function UserTable({
                                     <td>{user.phone}</td>
                                     <td>{user.city ?? "—"}</td>
                                     <td>{user.company.name}</td>
-                                    <td>
-                                        <button
-                                            onClick={() => onEdit(user)}
-                                            disabled={deletingUserId === user.id}
-                                        >
-                                            Edit
-                                        </button>
+                                    {canEdit && (
+                                        <td>
+                                            <button
+                                                onClick={() => onEdit(user)}
+                                                disabled={deletingUserId === user.id}
+                                            >
+                                                Edit
+                                            </button>
 
-                                        <button
-                                            onClick={() => onDelete(user)}
-                                            disabled={deletingUserId === user.id}
-                                        >
-                                            {deletingUserId === user.id
-                                                ? "Deleting..."
-                                                : "Delete"}
-                                        </button>
-                                    </td>
+                                            <button
+                                                onClick={() => onDelete(user)}
+                                                disabled={deletingUserId === user.id}
+                                            >
+                                                {deletingUserId === user.id
+                                                    ? "Deleting..."
+                                                    : "Delete"}
+                                            </button>
+                                        </td>
+                                    )}
                                 </tr>
                             ))}
                         </tbody>
