@@ -5,9 +5,11 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.exceptions import AppError, EmailAlreadyExists, UserNotFound
 from app.logging_config import configure_logging
+from app.middleware import REQUEST_ID_HEADER, request_logging_middleware
 from app.routers import users
 
 # The database schema is managed only by Alembic migrations:
@@ -21,11 +23,16 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 app = FastAPI(title="User Management API")
 
+# Order matters: the LAST middleware added is the OUTERMOST layer.
+# Request logging is added first so it sits INSIDE CORS, which means the
+# 500 responses it creates still get CORS headers on the way out.
+app.add_middleware(BaseHTTPMiddleware, dispatch=request_logging_middleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[FRONTEND_URL],
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=[REQUEST_ID_HEADER],  # let frontend JS read the request ID
 )
 
 # The ONE place where application exceptions become HTTP status codes.
@@ -65,7 +72,10 @@ def validation_error_handler(request: Request, error: RequestValidationError) ->
 
 @app.exception_handler(Exception)
 def unexpected_error_handler(request: Request, error: Exception) -> JSONResponse:
-    """Last line of defence: log the real error, tell the client nothing internal."""
+    """Safety net only: errors in routes are caught by request_logging_middleware.
+
+    This runs only if something fails outside it (e.g. in a middleware itself).
+    """
     logger.exception("Unhandled error on %s %s", request.method, request.url.path)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
