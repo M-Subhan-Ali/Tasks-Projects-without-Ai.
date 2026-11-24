@@ -134,3 +134,23 @@ class UserListResponse(BaseModel):
     total: int
     page: int
     limit: int
+
+
+# --- Auth ------------------------------------------------------------------
+
+
+class RegisterRequest(BaseModel):
+    # No str_strip_whitespace here: spaces in a password are part of the password.
+    email: Email
+    # max_length stops someone sending a huge "password" to make hashing slow (DoS).
+    password: str = Field(min_length=8, max_length=128)
+
+
+class AccountResponse(BaseModel):
+    """What the API shows about an account. hashed_password is deliberately absent."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    email: str
+    role: str

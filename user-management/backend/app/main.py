@@ -10,7 +10,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.exceptions import AppError, EmailAlreadyExists, UserNotFound
 from app.logging_config import configure_logging
 from app.middleware import REQUEST_ID_HEADER, request_logging_middleware
-from app.routers import users
+from app.routers import auth, users
 
 # The database schema is managed only by Alembic migrations:
 #   alembic upgrade head
@@ -83,6 +83,7 @@ def unexpected_error_handler(request: Request, error: Exception) -> JSONResponse
     )
 
 
+app.include_router(auth.router)
 app.include_router(users.router)
 
 
