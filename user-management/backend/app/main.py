@@ -7,10 +7,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.exceptions import AppError, EmailAlreadyExists, UserNotFound
+from app.exceptions import (
+    AppError,
+    EmailAlreadyExists,
+    InvalidCredentials,
+    NotAuthenticated,
+    PermissionDenied,
+    UserNotFound,
+)
 from app.logging_config import configure_logging
 from app.middleware import REQUEST_ID_HEADER, request_logging_middleware
-from app.routers import users
+from app.routers import auth, users
 
 # The database schema is managed only by Alembic migrations:
 #   alembic upgrade head
@@ -39,6 +46,9 @@ app.add_middleware(
 APP_ERROR_STATUS_CODES: dict[type[AppError], int] = {
     UserNotFound: status.HTTP_404_NOT_FOUND,
     EmailAlreadyExists: status.HTTP_409_CONFLICT,
+    InvalidCredentials: status.HTTP_401_UNAUTHORIZED,
+    NotAuthenticated: status.HTTP_401_UNAUTHORIZED,
+    PermissionDenied: status.HTTP_403_FORBIDDEN,
 }
 
 
@@ -47,7 +57,15 @@ def app_error_handler(request: Request, error: AppError) -> JSONResponse:
     status_code = APP_ERROR_STATUS_CODES.get(
         type(error), status.HTTP_400_BAD_REQUEST
     )
-    return JSONResponse(status_code=status_code, content={"detail": error.message})
+    # The HTTP spec requires a 401 to say which auth scheme the client should use.
+    headers = (
+        {"WWW-Authenticate": "Bearer"}
+        if status_code == status.HTTP_401_UNAUTHORIZED
+        else None
+    )
+    return JSONResponse(
+        status_code=status_code, content={"detail": error.message}, headers=headers
+    )
 
 
 def _format_validation_error(error: dict) -> dict[str, str]:
@@ -83,6 +101,7 @@ def unexpected_error_handler(request: Request, error: Exception) -> JSONResponse
     )
 
 
+app.include_router(auth.router)
 app.include_router(users.router)
 
 

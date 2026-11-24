@@ -20,3 +20,25 @@ class EmailAlreadyExists(AppError):
     def __init__(self, email: str) -> None:
         super().__init__("This email already exists")
         self.email = email
+
+
+class InvalidCredentials(AppError):
+    """Wrong email OR wrong password. One message for both, on purpose:
+    a different message would tell an attacker which emails have accounts."""
+
+    def __init__(self) -> None:
+        super().__init__("Invalid email or password")
+
+
+class NotAuthenticated(AppError):
+    """Missing, invalid or expired token, or the account no longer exists."""
+
+    def __init__(self, message: str = "Not authenticated") -> None:
+        super().__init__(message)
+
+
+class PermissionDenied(AppError):
+    """Logged in, but the account's role is not allowed to do this (403)."""
+
+    def __init__(self) -> None:
+        super().__init__("You do not have permission to perform this action")

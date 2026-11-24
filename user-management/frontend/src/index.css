@@ -82,3 +82,44 @@ td {
   background-color: #ffebee;
   color: #c62828;
 }
+
+.message.info {
+  background-color: #e3f2fd;
+  color: #1565c0;
+}
+
+.auth-page {
+  max-width: 400px;
+}
+
+.auth-page input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #ddd;
+}
+
+.role-badge {
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.role-admin {
+  background-color: #fff3e0;
+  color: #e65100;
+}
+
+.role-viewer {
+  background-color: #eceff1;
+  color: #455a64;
+}
