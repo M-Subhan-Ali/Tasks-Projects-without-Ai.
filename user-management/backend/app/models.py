@@ -13,7 +13,7 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(100))
     email: Mapped[str] = mapped_column(String(100), unique=True)
     phone: Mapped[str] = mapped_column(String(50))
-    city: Mapped[str] = mapped_column(String(100), default="", server_default="")
+    city: Mapped[str | None] = mapped_column(String(100), nullable=True)
     company_name: Mapped[str] = mapped_column(String(100))
     is_deleted: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=false()

@@ -33,7 +33,7 @@ function getInitialFormData(user?: User): UserFormData {
         name: user.name,
         email: user.email,
         phone: user.phone,
-        city: user.city,
+        city: user.city ?? "",
         company: user.company.name,
     };
 }
@@ -92,11 +92,10 @@ function UserForm({
             newErrors.phone = "Phone number must have 7 to 15 digits";
         }
 
-        if (!city) {
-            newErrors.city = "City is required";
-        } else if (city.length < 2) {
+        // City is optional: only validate it when something was typed.
+        if (city && city.length < 2) {
             newErrors.city = "City must be at least 2 characters";
-        } else if (!NAME_PATTERN.test(city)) {
+        } else if (city && !NAME_PATTERN.test(city)) {
             newErrors.city = "City can only contain letters, spaces, . ' -";
         }
 
@@ -180,7 +179,7 @@ function UserForm({
             </div>
 
             <div>
-                <label>City</label>
+                <label>City (optional)</label>
 
                 <input
                     type="text"

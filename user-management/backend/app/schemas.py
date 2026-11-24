@@ -74,7 +74,7 @@ class UserCreate(BaseModel):
     name: Name
     email: Email
     phone: Phone
-    city: City
+    city: City | None = None
     company: Company
 
 
@@ -89,7 +89,8 @@ class UserUpdate(BaseModel):
     city: City | None = None
     company: Company | None = None
 
-    @field_validator("*", mode="before")
+    # city is nullable in the database, so {"city": null} is allowed and clears it.
+    @field_validator("name", "email", "phone", "company", mode="before")
     @classmethod
     def reject_explicit_null(cls, value: Any) -> Any:
         # Validators don't run for fields that were left out, so this only
@@ -112,7 +113,7 @@ class UserResponse(BaseModel):
     name: str
     email: str
     phone: str
-    city: str
+    city: str | None
     company: CompanyResponse
 
     @classmethod

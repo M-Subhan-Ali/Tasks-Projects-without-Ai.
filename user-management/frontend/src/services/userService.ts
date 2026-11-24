@@ -90,7 +90,7 @@ function toPayload(formData: UserFormData): UserPayload {
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
-        city: formData.city,
+        city: formData.city || null,
         company: { name: formData.company },
     };
 }
