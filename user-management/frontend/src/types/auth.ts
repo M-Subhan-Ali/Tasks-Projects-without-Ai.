@@ -6,12 +6,6 @@ export interface Account {
     role: Role;
 }
 
-export interface TokenResponse {
-    access_token: string;
-    token_type: string;
-    expires_in: number;
-}
-
 export interface Credentials {
     email: string;
     password: string;

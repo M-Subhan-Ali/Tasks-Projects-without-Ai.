@@ -14,7 +14,7 @@ function AppHeader() {
                 <span className={`role-badge role-${account.role}`}>{account.role}</span>
             </span>
 
-            <button onClick={logout}>Logout</button>
+            <button onClick={() => void logout()}>Logout</button>
         </header>
     );
 }

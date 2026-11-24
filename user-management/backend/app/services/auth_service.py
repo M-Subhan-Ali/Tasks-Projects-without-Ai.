@@ -4,6 +4,8 @@ Like user_service, this layer never imports FastAPI: it raises application
 exceptions, and main.py turns them into HTTP responses.
 """
 
+from dataclasses import dataclass
+
 import jwt
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -42,8 +44,14 @@ def register(db: Session, data: RegisterRequest) -> Account:
         raise
 
 
-def login(db: Session, data: LoginRequest) -> str:
-    """Check the email and password and return a signed access token."""
+@dataclass(frozen=True)
+class LoginResult:
+    account: Account
+    access_token: str
+
+
+def login(db: Session, data: LoginRequest) -> LoginResult:
+    """Check the email and password; return the account and a signed access token."""
     account = account_repository.get_by_email(db, data.email)
 
     if account is None:
@@ -52,7 +60,7 @@ def login(db: Session, data: LoginRequest) -> str:
     if not verify_password(account.hashed_password, data.password):
         raise InvalidCredentials()
 
-    return create_access_token(account.id, account.role)
+    return LoginResult(account=account, access_token=create_access_token(account.id, account.role))
 
 
 def get_account_from_token(db: Session, token: str) -> Account:

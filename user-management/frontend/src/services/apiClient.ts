@@ -1,8 +1,11 @@
 import type { ApiErrorResponse } from "../types/user";
-import { clearToken, getToken } from "./tokenStorage";
 
 // The ONE place that talks to the API: every request goes through request(),
-// which adds the Authorization header and handles 401/403 the same way everywhere.
+// which sends the auth cookie and handles 401/403 the same way everywhere.
+//
+// The login token lives in an httpOnly cookie set by the backend. This code
+// never sees it (JavaScript cannot read httpOnly cookies, so neither can an
+// XSS attack); `credentials: "include"` just tells the browser to send it.
 
 export const API_URL = import.meta.env.VITE_API_URL;
 
@@ -20,11 +23,12 @@ export class ApiError extends Error {
 }
 
 // AuthProvider registers a callback here, so a 401 anywhere logs the user out
-// without every caller having to handle it.
-let onSessionExpired: (() => void) | undefined;
+// without every caller having to handle it. AuthProvider decides whether the
+// 401 means "session expired" (you were logged in) or just "not logged in".
+let onUnauthorized: (() => void) | undefined;
 
-export function setSessionExpiredHandler(handler: (() => void) | undefined): void {
-    onSessionExpired = handler;
+export function setUnauthorizedHandler(handler: (() => void) | undefined): void {
+    onUnauthorized = handler;
 }
 
 function getStatusMessage(status: number): string {
@@ -65,12 +69,8 @@ async function getResponseErrorMessage(response: Response): Promise<string> {
 }
 
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-    const token = getToken();
     const headers = new Headers(options.headers);
 
-    if (token) {
-        headers.set("Authorization", `Bearer ${token}`);
-    }
     if (options.body) {
         headers.set("Content-Type", "application/json");
     }
@@ -78,19 +78,20 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
     let response: Response;
 
     try {
-        response = await fetch(`${API_URL}${path}`, { ...options, headers });
+        response = await fetch(`${API_URL}${path}`, {
+            ...options,
+            headers,
+            credentials: "include", // send the auth cookie to the API (another port)
+        });
     } catch {
         throw new Error(
             "Cannot connect to the server. Please make sure the backend is running."
         );
     }
 
-    // 401 with a token = the token is expired or invalid: log out.
-    // 401 without a token (e.g. a wrong password at login) is a normal error.
-    if (response.status === 401 && token) {
-        clearToken();
-        onSessionExpired?.();
-        throw new ApiError(SESSION_EXPIRED_MESSAGE, 401);
+    if (response.status === 401) {
+        onUnauthorized?.();
+        throw new ApiError(await getResponseErrorMessage(response), 401);
     }
 
     if (response.status === 403) {

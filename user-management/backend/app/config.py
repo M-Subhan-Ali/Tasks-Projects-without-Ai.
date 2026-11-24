@@ -40,6 +40,20 @@ def _read_expire_minutes() -> int:
     return minutes
 
 
+def _read_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes"}
+
+
 JWT_SECRET = _read_jwt_secret()
 JWT_EXPIRE_MINUTES = _read_expire_minutes()
 JWT_ALGORITHM = "HS256"
+
+# The login token is stored in this httpOnly cookie.
+AUTH_COOKIE_NAME = "access_token"
+# Secure = only sent over HTTPS. Browsers treat http://localhost as secure, so
+# this works in development too; set COOKIE_SECURE=false only if your browser
+# refuses the cookie on plain http.
+COOKIE_SECURE = _read_bool("COOKIE_SECURE", default=True)
