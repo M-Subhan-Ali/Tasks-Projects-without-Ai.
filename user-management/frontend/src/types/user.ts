@@ -7,7 +7,7 @@ export interface User {
     name: string;
     email: string;
     phone: string;
-    city: string;
+    city: string | null;
     company: Company;
 }
 

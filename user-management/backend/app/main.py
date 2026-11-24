@@ -6,18 +6,18 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.database import Base, engine
 from app.exceptions import AppError, EmailAlreadyExists, UserNotFound
 from app.logging_config import configure_logging
 from app.routers import users
+
+# The database schema is managed only by Alembic migrations:
+#   alembic upgrade head
+# The app no longer creates or alters tables on startup.
 
 configure_logging()
 logger = logging.getLogger(__name__)
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
-
-# Temporary: Alembic migrations replace this in Phase 6.
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="User Management API")
 

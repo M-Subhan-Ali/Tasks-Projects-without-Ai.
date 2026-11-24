@@ -68,7 +68,7 @@ function UserTable({
                                     <td>{user.name}</td>
                                     <td>{user.email}</td>
                                     <td>{user.phone}</td>
-                                    <td>{user.city}</td>
+                                    <td>{user.city ?? "—"}</td>
                                     <td>{user.company.name}</td>
                                     <td>
                                         <button
