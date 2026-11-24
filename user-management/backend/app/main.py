@@ -12,6 +12,7 @@ from app.exceptions import (
     EmailAlreadyExists,
     InvalidCredentials,
     NotAuthenticated,
+    PermissionDenied,
     UserNotFound,
 )
 from app.logging_config import configure_logging
@@ -47,6 +48,7 @@ APP_ERROR_STATUS_CODES: dict[type[AppError], int] = {
     EmailAlreadyExists: status.HTTP_409_CONFLICT,
     InvalidCredentials: status.HTTP_401_UNAUTHORIZED,
     NotAuthenticated: status.HTTP_401_UNAUTHORIZED,
+    PermissionDenied: status.HTTP_403_FORBIDDEN,
 }
 
 

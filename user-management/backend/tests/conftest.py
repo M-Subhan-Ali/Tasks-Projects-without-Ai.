@@ -24,6 +24,8 @@ from sqlalchemy.pool import StaticPool  # noqa: E402
 
 from app.database import Base, get_db  # noqa: E402
 from app.main import app  # noqa: E402
+from app.models import Account, Role  # noqa: E402
+from app.security import create_access_token  # noqa: E402
 from tests.factories import user_payload  # noqa: E402
 
 REAL_DB_PATH = Path(__file__).resolve().parents[1] / "users.db"
@@ -77,17 +79,56 @@ def client(engine: Engine) -> Iterator[TestClient]:
     app.dependency_overrides[get_db] = override_get_db
     # raise_server_exceptions=False: let the app turn crashes into 500s,
     # like it does for real clients, instead of re-raising inside the test.
+    # This client sends NO token: use it to test 401 responses.
     with TestClient(app, raise_server_exceptions=False) as test_client:
         yield test_client
     app.dependency_overrides.clear()
 
 
+def _auth_headers(db_session: Session, email: str, role: Role) -> dict[str, str]:
+    """Create an account straight in the test database and sign a token for it.
+
+    Skips register/login on purpose: Argon2 is slow, and these fixtures are for
+    testing /users, not the login flow (tests/test_auth.py covers that).
+    """
+    account = Account(email=email, hashed_password="not-a-real-hash", role=role.value)
+    db_session.add(account)
+    db_session.commit()
+    token = create_access_token(account.id, account.role)
+    return {"Authorization": f"Bearer {token}"}
+
+
 @pytest.fixture
-def create_user(client: TestClient) -> Any:
-    """Create a user through the API and return the response JSON."""
+def admin_headers(db_session: Session) -> dict[str, str]:
+    return _auth_headers(db_session, "admin@test.com", Role.ADMIN)
+
+
+@pytest.fixture
+def viewer_headers(db_session: Session) -> dict[str, str]:
+    return _auth_headers(db_session, "viewer@test.com", Role.VIEWER)
+
+
+@pytest.fixture
+def admin_client(client: TestClient, admin_headers: dict[str, str]) -> TestClient:
+    """A client that sends an admin token with every request.
+
+    Depends on `client` so the get_db override is in place.
+    """
+    return TestClient(app, raise_server_exceptions=False, headers=admin_headers)
+
+
+@pytest.fixture
+def viewer_client(client: TestClient, viewer_headers: dict[str, str]) -> TestClient:
+    """A client that sends a viewer token with every request."""
+    return TestClient(app, raise_server_exceptions=False, headers=viewer_headers)
+
+
+@pytest.fixture
+def create_user(admin_client: TestClient) -> Any:
+    """Create a user through the API (as an admin) and return the response JSON."""
 
     def _create(**overrides: Any) -> dict[str, Any]:
-        response = client.post("/users", json=user_payload(**overrides))
+        response = admin_client.post("/users", json=user_payload(**overrides))
         assert response.status_code == 201, response.text
         return response.json()
 

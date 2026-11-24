@@ -1,6 +1,10 @@
 """HTTP layer for /users: receive the request, call the service, return a response.
 
 No database queries and no business rules here.
+
+Access:
+- every route needs a valid token (router-level dependency): viewers can read;
+- routes that change data also need the admin role (require_role).
 """
 
 from typing import Annotated
@@ -9,12 +13,19 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies import get_current_account, require_role
+from app.models import Role
 from app.schemas import UserCreate, UserListResponse, UserResponse, UserUpdate
 from app.services import user_service
 
-router = APIRouter(prefix="/users", tags=["Users"])
+router = APIRouter(
+    prefix="/users",
+    tags=["Users"],
+    dependencies=[Depends(get_current_account)],
+)
 
 DbSession = Annotated[Session, Depends(get_db)]
+ADMIN_ONLY = [Depends(require_role(Role.ADMIN))]
 
 
 @router.get("", response_model=UserListResponse)
@@ -39,22 +50,31 @@ def get_user(user_id: int, db: DbSession) -> UserResponse:
     return UserResponse.from_model(user_service.get_user(db, user_id))
 
 
-@router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=ADMIN_ONLY,
+)
 def create_user(user_data: UserCreate, db: DbSession) -> UserResponse:
     return UserResponse.from_model(user_service.create_user(db, user_data))
 
 
-@router.put("/{user_id}", response_model=UserResponse)
+@router.put("/{user_id}", response_model=UserResponse, dependencies=ADMIN_ONLY)
 def replace_user(user_id: int, user_data: UserCreate, db: DbSession) -> UserResponse:
     return UserResponse.from_model(user_service.replace_user(db, user_id, user_data))
 
 
-@router.patch("/{user_id}", response_model=UserResponse)
+@router.patch("/{user_id}", response_model=UserResponse, dependencies=ADMIN_ONLY)
 def update_user(user_id: int, user_data: UserUpdate, db: DbSession) -> UserResponse:
     return UserResponse.from_model(user_service.update_user(db, user_id, user_data))
 
 
-@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=ADMIN_ONLY,
+)
 def delete_user(user_id: int, db: DbSession) -> Response:
     user_service.delete_user(db, user_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
