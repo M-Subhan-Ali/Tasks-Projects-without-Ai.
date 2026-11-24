@@ -24,3 +24,12 @@ def add_account(db: Session, account: Account) -> Account:
 
     db.refresh(account)
     return account
+
+
+def get_by_email(db: Session, email: str) -> Account | None:
+    query = select(Account).where(func.lower(Account.email) == email.lower())
+    return db.scalars(query).first()
+
+
+def get_by_id(db: Session, account_id: int) -> Account | None:
+    return db.get(Account, account_id)

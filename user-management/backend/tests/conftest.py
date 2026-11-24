@@ -10,6 +10,7 @@ The real users.db is never used:
 import os
 
 os.environ["DATABASE_URL"] = "sqlite://"
+os.environ["JWT_SECRET"] = "test-secret-that-is-at-least-32-characters-long"
 
 from collections.abc import Generator, Iterator  # noqa: E402
 from pathlib import Path  # noqa: E402
