@@ -8,7 +8,7 @@ export interface AuthContextValue {
     // Shown on the login page, e.g. after the session expired.
     notice: string | undefined;
     login: (credentials: Credentials) => Promise<void>;
-    logout: () => void;
+    logout: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined);

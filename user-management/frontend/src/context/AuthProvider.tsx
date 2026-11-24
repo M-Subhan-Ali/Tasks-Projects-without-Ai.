@@ -1,27 +1,26 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
-import { SESSION_EXPIRED_MESSAGE, setSessionExpiredHandler } from "../services/apiClient";
+import { SESSION_EXPIRED_MESSAGE, setUnauthorizedHandler } from "../services/apiClient";
 import * as authService from "../services/authService";
-import { clearToken, getToken, setToken } from "../services/tokenStorage";
 import type { Account, AuthStatus, Credentials } from "../types/auth";
 import { AuthContext } from "./AuthContext";
 
 function AuthProvider({ children }: { children: ReactNode }) {
     const [account, setAccount] = useState<Account | null>(null);
-    // With a saved token we must ask the server who we are before showing pages.
-    const [status, setStatus] = useState<AuthStatus>(() =>
-        getToken() ? "checking" : "anonymous"
-    );
+    // The auth cookie is httpOnly, so JavaScript cannot tell whether one exists.
+    // Every page load starts by asking the server: GET /auth/me.
+    const [status, setStatus] = useState<AuthStatus>("checking");
     const [notice, setNotice] = useState<string>();
 
-    // On page load: turn a saved token back into the logged-in account.
-    // An expired token gets a 401 here, which the session-expired handler handles.
+    // Read by the 401 handler, which is registered once and must see the latest status.
+    const statusRef = useRef<AuthStatus>("checking");
     useEffect(() => {
-        if (!getToken()) {
-            return;
-        }
+        statusRef.current = status;
+    }, [status]);
 
+    // On page load: if the browser has a valid cookie, /auth/me returns the account.
+    useEffect(() => {
         let isCancelled = false;
 
         authService
@@ -33,6 +32,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
                 }
             })
             .catch(() => {
+                // 401 (no cookie / expired) or network error: show the login page.
                 if (!isCancelled) {
                     setStatus("anonymous");
                 }
@@ -43,40 +43,36 @@ function AuthProvider({ children }: { children: ReactNode }) {
         };
     }, []);
 
-    // Any request that gets a 401 with a token ends the session.
+    // Any 401 ends the session. Only call it "expired" if the user was logged in;
+    // a 401 for a wrong password or the first /auth/me check is not an expiry.
     useEffect(() => {
-        setSessionExpiredHandler(() => {
-            setAccount(null);
-            setStatus("anonymous");
-            setNotice(SESSION_EXPIRED_MESSAGE);
+        setUnauthorizedHandler(() => {
+            if (statusRef.current === "authenticated") {
+                setAccount(null);
+                setStatus("anonymous");
+                setNotice(SESSION_EXPIRED_MESSAGE);
+            }
         });
 
-        return () => setSessionExpiredHandler(undefined);
+        return () => setUnauthorizedHandler(undefined);
     }, []);
 
     const login = useCallback(async (credentials: Credentials) => {
-        // Drop any stale token so a wrong password is not mistaken for an expired session.
-        clearToken();
-        const { access_token } = await authService.login(credentials);
-        setToken(access_token);
-
-        try {
-            // The token only says who we are; /auth/me returns the current email and role.
-            const current = await authService.getCurrentAccount();
-            setAccount(current);
-            setStatus("authenticated");
-            setNotice(undefined);
-        } catch (error: unknown) {
-            clearToken();
-            throw error;
-        }
+        // The server sets the httpOnly cookie and returns the account.
+        const current = await authService.login(credentials);
+        setAccount(current);
+        setStatus("authenticated");
+        setNotice(undefined);
     }, []);
 
-    const logout = useCallback(() => {
-        clearToken();
-        setAccount(null);
-        setStatus("anonymous");
-        setNotice("You have been logged out.");
+    const logout = useCallback(async () => {
+        try {
+            await authService.logout(); // the server deletes the cookie
+        } finally {
+            setAccount(null);
+            setStatus("anonymous");
+            setNotice("You have been logged out.");
+        }
     }, []);
 
     const value = useMemo(

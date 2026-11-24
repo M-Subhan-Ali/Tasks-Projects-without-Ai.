@@ -9,7 +9,8 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import JWT_ALGORITHM, JWT_EXPIRE_MINUTES, JWT_SECRET
+from app.config import AUTH_COOKIE_NAME, JWT_ALGORITHM, JWT_EXPIRE_MINUTES, JWT_SECRET
+from app.main import app
 from app.models import Account, Role
 from app.security import create_access_token
 from tests.factories import user_payload
@@ -28,6 +29,13 @@ def login(client: TestClient, email: str = EMAIL, password: str = PASSWORD) -> A
 
 def bearer(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def browser(client: TestClient) -> TestClient:
+    """Acts like the browser: HTTPS (the cookie is Secure) and keeps cookies
+    between requests. Depends on `client` so the test database is in place."""
+    return TestClient(app, base_url="https://testserver", raise_server_exceptions=False)
 
 
 def signed_token(**claims: Any) -> str:
@@ -111,30 +119,69 @@ def test_unknown_email_gets_same_error_as_wrong_password(client: TestClient) -> 
     assert unknown_email.json() == wrong_password.json()
 
 
-def test_login_returns_jwt_that_decodes(client: TestClient) -> None:
-    account_id = register(client).json()["id"]
+def test_login_returns_jwt_that_decodes(browser: TestClient) -> None:
+    account_id = register(browser).json()["id"]
 
-    response = login(client, email=EMAIL.upper())  # email is case-insensitive
+    response = login(browser, email=EMAIL.upper())  # email is case-insensitive
 
     assert response.status_code == 200
-    body = response.json()
-    assert body["token_type"] == "bearer"
-    assert body["expires_in"] == JWT_EXPIRE_MINUTES * 60
+    assert response.json() == {"id": account_id, "email": EMAIL, "role": "viewer"}
 
-    payload = jwt.decode(body["access_token"], JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    payload = jwt.decode(
+        response.cookies[AUTH_COOKIE_NAME], JWT_SECRET, algorithms=[JWT_ALGORITHM]
+    )
     assert payload["sub"] == str(account_id)
     assert payload["role"] == "viewer"
     assert payload["exp"] - payload["iat"] == JWT_EXPIRE_MINUTES * 60
 
 
-def test_me_returns_logged_in_account(client: TestClient) -> None:
+def test_login_sets_secure_httponly_cookie_and_hides_token(browser: TestClient) -> None:
+    register(browser)
+
+    response = login(browser)
+
+    # The token is only in the cookie, never in the JSON that JavaScript can read.
+    assert "access_token" not in response.json()
+    assert response.cookies[AUTH_COOKIE_NAME] not in response.text
+
+    set_cookie = response.headers["set-cookie"].lower()
+    assert set_cookie.startswith(f"{AUTH_COOKIE_NAME}=")
+    assert "httponly" in set_cookie  # JavaScript cannot read it (XSS)
+    assert "secure" in set_cookie  # only sent over HTTPS
+    assert "samesite=strict" in set_cookie  # not sent by other sites (CSRF)
+    assert f"max-age={JWT_EXPIRE_MINUTES * 60}" in set_cookie
+    assert "path=/" in set_cookie
+
+
+def test_me_returns_logged_in_account(browser: TestClient) -> None:
+    register(browser)
+    login(browser)  # the cookie is now stored in the client
+
+    response = browser.get("/auth/me")
+
+    assert response.status_code == 200
+    assert response.json()["email"] == EMAIL
+
+
+def test_logout_clears_cookie(browser: TestClient) -> None:
+    register(browser)
+    login(browser)
+    assert browser.get("/auth/me").status_code == 200
+
+    response = browser.post("/auth/logout")
+
+    assert response.status_code == 204
+    assert "max-age=0" in response.headers["set-cookie"].lower()
+    assert browser.get("/auth/me").status_code == 401
+
+
+def test_bearer_header_still_works_for_api_clients(client: TestClient) -> None:
     register(client)
-    token = login(client).json()["access_token"]
+    token = login(client).cookies[AUTH_COOKIE_NAME]
 
     response = client.get("/auth/me", headers=bearer(token))
 
     assert response.status_code == 200
-    assert response.json()["email"] == EMAIL
 
 
 # --- Tokens ----------------------------------------------------------------------
@@ -215,6 +262,15 @@ def test_viewer_can_read_users(viewer_client: TestClient, create_user: Any) -> N
 
     assert viewer_client.get("/users").status_code == 200
     assert viewer_client.get(f"/users/{user['id']}").status_code == 200
+
+
+def test_viewer_cookie_session_gets_403_on_delete(browser: TestClient, create_user: Any) -> None:
+    user = create_user()
+    register(browser)
+    login(browser)
+
+    assert browser.get("/users").status_code == 200
+    assert browser.delete(f"/users/{user['id']}").status_code == 403
 
 
 def test_viewer_delete_returns_403(viewer_client: TestClient, create_user: Any) -> None:

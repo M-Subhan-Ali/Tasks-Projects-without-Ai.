@@ -37,6 +37,9 @@ app.add_middleware(BaseHTTPMiddleware, dispatch=request_logging_middleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[FRONTEND_URL],
+    # Needed so the browser sends and accepts the auth cookie. This is only
+    # allowed together with an explicit origin list, never "*".
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=[REQUEST_ID_HEADER],  # let frontend JS read the request ID
