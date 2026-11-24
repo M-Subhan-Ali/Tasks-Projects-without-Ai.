@@ -1,4 +1,4 @@
-# Cloudpacer – Fundamental Week
+# Fundamental Week
 
 | Folder | Task | What it is |
 |---|---|---|
