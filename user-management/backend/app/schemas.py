@@ -1,4 +1,5 @@
 import re
+from datetime import datetime
 from typing import Annotated, Any
 
 from pydantic import (
@@ -7,10 +8,12 @@ from pydantic import (
     ConfigDict,
     EmailStr,
     Field,
+    HttpUrl,
+    UrlConstraints,
     field_validator,
 )
 
-from app.models import User
+from app.models import User, WebhookEvent
 
 NAME_PATTERN = r"^[A-Za-z\s.'-]+$"
 PHONE_PATTERN = r"^\+?[0-9\s()-]+$"
@@ -159,3 +162,52 @@ class AccountResponse(BaseModel):
 class LoginRequest(BaseModel):
     email: Email
     password: str = Field(min_length=1, max_length=128)
+
+
+# --- Webhooks --------------------------------------------------------------
+
+# http(s) only, and at most 2048 characters (the column size).
+WebhookUrl = Annotated[HttpUrl, UrlConstraints(max_length=2048)]
+
+
+class WebhookCreate(BaseModel):
+    url: WebhookUrl
+    # Only the three known events are accepted; anything else is a 422.
+    events: list[WebhookEvent] = Field(min_length=1)
+
+    @field_validator("events")
+    @classmethod
+    def remove_duplicates(cls, events: list[WebhookEvent]) -> list[WebhookEvent]:
+        # ["user.created", "user.created"] would otherwise send every event twice.
+        return list(dict.fromkeys(events))
+
+
+class WebhookResponse(BaseModel):
+    """What GET /webhooks shows. The secret is deliberately absent."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    url: str
+    events: list[WebhookEvent]
+    created_at: datetime
+
+
+class WebhookCreatedResponse(WebhookResponse):
+    """Only POST /webhooks returns this: the one and only time the secret is shown."""
+
+    secret: str
+
+
+class WebhookDeliveryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    event_id: str
+    event: WebhookEvent
+    attempt: int
+    success: bool
+    status_code: int | None
+    error: str | None
+    duration_ms: int
+    created_at: datetime

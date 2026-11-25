@@ -22,7 +22,7 @@ from sqlalchemy import Engine, create_engine  # noqa: E402
 from sqlalchemy.orm import Session, sessionmaker  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
-from app.database import Base, get_db  # noqa: E402
+from app.database import Base, get_db, get_session_factory  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import Account, Role  # noqa: E402
 from app.security import create_access_token  # noqa: E402
@@ -77,6 +77,9 @@ def client(engine: Engine) -> Iterator[TestClient]:
             session.close()
 
     app.dependency_overrides[get_db] = override_get_db
+    # Background tasks (webhook deliveries) open their own sessions: point
+    # them at the test database too.
+    app.dependency_overrides[get_session_factory] = lambda: testing_session
     # raise_server_exceptions=False: let the app turn crashes into 500s,
     # like it does for real clients, instead of re-raising inside the test.
     # This client sends NO token: use it to test 401 responses.
