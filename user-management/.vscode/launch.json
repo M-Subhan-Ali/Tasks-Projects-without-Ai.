@@ -1,0 +1,44 @@
+{
+    // Open the user-management folder in VS Code, then Run and Debug (Ctrl+Shift+D)
+    // and pick one of these. Needs the "Python Debugger" extension (ms-python.debugpy).
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Backend: FastAPI (uvicorn)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            // No --reload: the reloader runs the app in a child process, where
+            // breakpoints are not hit reliably. Restart the debugger after edits.
+            "args": ["app.main:app", "--port", "8000", "--no-access-log"],
+            "cwd": "${workspaceFolder}/backend",
+            "python": "${workspaceFolder}/backend/venv/Scripts/python.exe",
+            "env": { "LOG_LEVEL": "DEBUG" },
+            // false = also step into FastAPI/SQLAlchemy code; true = only your code.
+            "justMyCode": true,
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Backend: pytest (all tests)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": ["-v"],
+            "cwd": "${workspaceFolder}/backend",
+            "python": "${workspaceFolder}/backend/venv/Scripts/python.exe",
+            "justMyCode": true,
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Backend: pytest (current file)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": ["-v", "${file}"],
+            "cwd": "${workspaceFolder}/backend",
+            "python": "${workspaceFolder}/backend/venv/Scripts/python.exe",
+            "justMyCode": true,
+            "console": "integratedTerminal"
+        }
+    ]
+}
