@@ -2,15 +2,17 @@ from datetime import datetime
 from enum import StrEnum
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     CheckConstraint,
     DateTime,
+    ForeignKey,
     String,
     UniqueConstraint,
     false,
     func,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
@@ -18,6 +20,14 @@ from app.database import Base
 class Role(StrEnum):
     ADMIN = "admin"
     VIEWER = "viewer"
+
+
+class WebhookEvent(StrEnum):
+    """The events a webhook subscription can ask for."""
+
+    USER_CREATED = "user.created"
+    USER_UPDATED = "user.updated"
+    USER_DELETED = "user.deleted"
 
 
 class User(Base):
@@ -62,3 +72,56 @@ class Account(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class WebhookSubscription(Base):
+    """An external URL that wants to be told when users change."""
+
+    __tablename__ = "webhook_subscriptions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    url: Mapped[str] = mapped_column(String(2048))
+    # A list of WebhookEvent values, e.g. ["user.created", "user.deleted"].
+    events: Mapped[list[str]] = mapped_column(JSON)
+    # Stored as plain text on purpose: unlike a password, the server must be able
+    # to READ it to sign every request. It is returned once, at registration.
+    secret: Mapped[str] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    # Deleting a subscription deletes its delivery history too. The ORM does it
+    # (SQLite does not enforce foreign keys unless asked to).
+    deliveries: Mapped[list["WebhookDelivery"]] = relationship(
+        back_populates="subscription", cascade="all, delete-orphan"
+    )
+
+
+class WebhookDelivery(Base):
+    """One attempt to POST one event to one subscription. Retries are new rows."""
+
+    __tablename__ = "webhook_deliveries"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    subscription_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "webhook_subscriptions.id",
+            ondelete="CASCADE",
+            name="fk_webhook_deliveries_subscription_id",
+        ),
+        index=True,
+    )
+    # Same for every attempt of one event, so retries can be grouped together.
+    event_id: Mapped[str] = mapped_column(String(36))
+    event: Mapped[str] = mapped_column(String(50))
+    attempt: Mapped[int]
+    success: Mapped[bool] = mapped_column(Boolean)
+    # None when no response came back at all (timeout, connection refused).
+    status_code: Mapped[int | None]
+    error: Mapped[str | None] = mapped_column(String(500))
+    duration_ms: Mapped[int]
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    subscription: Mapped[WebhookSubscription] = relationship(back_populates="deliveries")

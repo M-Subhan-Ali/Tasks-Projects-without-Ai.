@@ -16,6 +16,12 @@ class UserNotFound(AppError):
         self.user_id = user_id
 
 
+class WebhookNotFound(AppError):
+    def __init__(self, webhook_id: int) -> None:
+        super().__init__("Webhook not found")
+        self.webhook_id = webhook_id
+
+
 class EmailAlreadyExists(AppError):
     def __init__(self, email: str) -> None:
         super().__init__("This email already exists")

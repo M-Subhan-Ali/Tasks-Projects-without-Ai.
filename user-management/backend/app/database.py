@@ -24,3 +24,12 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+def get_session_factory() -> sessionmaker[Session]:
+    """For work that runs AFTER the response (background tasks).
+
+    The request's session from get_db is closed by then, so the task opens its
+    own sessions from this factory. A dependency, so tests can override it.
+    """
+    return SessionLocal

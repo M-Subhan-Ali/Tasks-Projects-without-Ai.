@@ -72,14 +72,16 @@ def update_user(db: Session, user_id: int, user_data: UserUpdate) -> User:
     return _apply_changes(db, user_id, user_data.model_dump(exclude_unset=True))
 
 
-def delete_user(db: Session, user_id: int) -> None:
+def delete_user(db: Session, user_id: int) -> User:
+    """Soft-delete, and return the user as it was (for the user.deleted webhook)."""
     user = get_user(db, user_id)
 
     user.is_deleted = True
     user.deleted_at = datetime.now(timezone.utc)
 
-    user_repository.save_user(db, user)
+    user = user_repository.save_user(db, user)
     logger.info("User soft-deleted user_id=%s", user_id)
+    return user
 
 
 def _apply_changes(db: Session, user_id: int, changes: dict[str, Any]) -> User:
