@@ -99,7 +99,7 @@ function LoginPage() {
                     )}
                 </div>
 
-                <button type="submit" disabled={isSubmitting}>
+                <button type="submit" className="btn-primary" disabled={isSubmitting}>
                     {isSubmitting ? "Logging in..." : "Log in"}
                 </button>
             </form>

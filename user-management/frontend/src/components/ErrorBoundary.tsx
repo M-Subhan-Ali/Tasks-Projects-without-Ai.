@@ -41,7 +41,9 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
                     <p className="message error">
                         Something went wrong. Please reload the page.
                     </p>
-                    <button onClick={() => window.location.reload()}>Reload</button>
+                    <button className="btn-primary" onClick={() => window.location.reload()}>
+                        Reload
+                    </button>
                 </div>
             );
         }

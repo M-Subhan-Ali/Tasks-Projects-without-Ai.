@@ -127,7 +127,7 @@ function UserForm({
     };
 
     return (
-        <form onSubmit={handleSubmit} noValidate>
+        <form className="card" onSubmit={handleSubmit} noValidate>
             <h2>{user ? "Edit User" : "Add User"}</h2>
 
             <div>
@@ -208,8 +208,8 @@ function UserForm({
                 )}
             </div>
 
-            <div>
-                <button type="submit" disabled={isSubmitting}>
+            <div className="form-actions">
+                <button type="submit" className="btn-primary" disabled={isSubmitting}>
                     {isSubmitting
                         ? "Saving..."
                         : user

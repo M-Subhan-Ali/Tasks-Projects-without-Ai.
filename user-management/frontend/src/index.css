@@ -1,57 +1,426 @@
+/* ==========================================================================
+   Theme: design tokens
+   Every color, radius and shadow comes from these variables. To change the
+   look, change a value here; the rest of the file only uses var(--...).
+   Dark mode follows the operating system setting (prefers-color-scheme), so
+   it needs no JavaScript and no state.
+   ========================================================================== */
+
+:root {
+  color-scheme: light dark;
+
+  --color-bg: #f4f6fa;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f8fafc;
+  --color-border: #e2e8f0;
+  --color-text: #1e293b;
+  --color-text-muted: #64748b;
+
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-on-primary: #ffffff;
+  --color-focus: rgb(37 99 235 / 35%);
+
+  --color-danger: #dc2626;
+  --color-on-danger: #ffffff;
+
+  --color-success-bg: #ecfdf5;
+  --color-success-text: #047857;
+  --color-error-bg: #fef2f2;
+  --color-error-text: #b91c1c;
+  --color-info-bg: #eff6ff;
+  --color-info-text: #1d4ed8;
+
+  --color-admin-bg: #fff7ed;
+  --color-admin-text: #c2410c;
+  --color-viewer-bg: #f1f5f9;
+  --color-viewer-text: #475569;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 6%), 0 4px 12px rgb(15 23 42 / 6%);
+
+  --font-sans: system-ui, "Segoe UI", Roboto, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #0f172a;
+    --color-surface: #1e293b;
+    --color-surface-muted: #172033;
+    --color-border: #334155;
+    --color-text: #e2e8f0;
+    --color-text-muted: #94a3b8;
+
+    --color-primary: #3b82f6;
+    --color-primary-hover: #60a5fa;
+    --color-focus: rgb(96 165 250 / 40%);
+
+    --color-danger: #ef4444;
+
+    --color-success-bg: rgb(16 185 129 / 15%);
+    --color-success-text: #6ee7b7;
+    --color-error-bg: rgb(239 68 68 / 15%);
+    --color-error-text: #fca5a5;
+    --color-info-bg: rgb(59 130 246 / 15%);
+    --color-info-text: #93c5fd;
+
+    --color-admin-bg: rgb(249 115 22 / 15%);
+    --color-admin-text: #fdba74;
+    --color-viewer-bg: rgb(148 163 184 / 15%);
+    --color-viewer-text: #cbd5e1;
+
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 30%), 0 4px 12px rgb(0 0 0 / 25%);
+  }
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--color-text);
+  background-color: var(--color-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-.container {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 20px;
+h1 {
+  margin: 24px 0 16px;
+  font-size: 1.75rem;
+  line-height: 1.2;
 }
+
+h2 {
+  margin: 0 0 16px;
+  font-size: 1.2rem;
+}
+
+a {
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+a:hover {
+  color: var(--color-primary-hover);
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 24px 20px;
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+/* ==========================================================================
+   Buttons
+   Default = secondary (outlined). Add .btn-primary or .btn-danger.
+   ========================================================================== */
 
 button {
   margin: 4px 8px 4px 0;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
   cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+
+button:hover:not(:disabled) {
+  background-color: var(--color-surface-muted);
+  border-color: var(--color-text-muted);
 }
 
 button:disabled {
   cursor: not-allowed;
+  opacity: 0.55;
 }
 
+.btn-primary {
+  color: var(--color-on-primary);
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}
+
+.btn-danger {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+  background-color: transparent;
+}
+
+.btn-danger:hover:not(:disabled) {
+  color: var(--color-on-danger);
+  background-color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+/* Keyboard users see where they are; mouse clicks don't show the ring. */
+button:focus-visible,
+input:focus-visible,
+a:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-focus);
+}
+
+/* ==========================================================================
+   Forms
+   ========================================================================== */
+
 form div {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 form label {
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+input {
+  width: 100%;
+  padding: 9px 12px;
+  font: inherit;
+  color: var(--color-text);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+input::placeholder {
+  color: var(--color-text-muted);
+}
+
+input:focus {
+  border-color: var(--color-primary);
+}
+
+.error-text {
+  display: block;
+  margin-top: 4px;
+  color: var(--color-error-text);
+  font-size: 13px;
+}
+
+.form-actions {
+  margin: 20px 0 0;
+}
+
+/* ==========================================================================
+   Cards (form, table, login/register)
+   ========================================================================== */
+
+.card,
+.auth-page {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+.card {
+  margin-bottom: 20px;
+  padding: 20px;
+}
+
+.auth-page {
+  max-width: 420px;
+  margin-top: 48px;
+  padding: 28px;
+}
+
+.auth-page h1 {
+  margin-top: 0;
+}
+
+.auth-page button[type="submit"] {
+  width: 100%;
+  margin: 8px 0 0;
+  padding: 10px 14px;
+}
+
+/* ==========================================================================
+   Messages
+   ========================================================================== */
+
+.message {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+}
+
+.message.success {
+  background-color: var(--color-success-bg);
+  color: var(--color-success-text);
+}
+
+.message.error {
+  background-color: var(--color-error-bg);
+  color: var(--color-error-text);
+}
+
+.message.info {
+  background-color: var(--color-info-bg);
+  color: var(--color-info-text);
+}
+
+/* ==========================================================================
+   Header
+   ========================================================================== */
+
+.app-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+.app-header button {
+  margin: 0;
+}
+
+.role-badge {
+  margin-left: 6px;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.role-admin {
+  background-color: var(--color-admin-bg);
+  color: var(--color-admin-text);
+}
+
+.role-viewer {
+  background-color: var(--color-viewer-bg);
+  color: var(--color-viewer-text);
+}
+
+/* ==========================================================================
+   Toolbar, search, table, pagination
+   ========================================================================== */
+
+.toolbar {
+  margin-bottom: 16px;
+}
+
+.toolbar button {
+  margin: 0;
+}
+
+.search-input {
+  max-width: 360px;
+}
+
+.table-wrap {
+  overflow-x: auto; /* small screens scroll the table instead of squashing it */
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
+  font-size: 14px;
 }
 
 th,
 td {
-  border: 1px solid #ddd;
-  padding: 8px;
+  padding: 10px 12px;
   text-align: left;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
 }
+
+th {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  background-color: var(--color-surface-muted);
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+tbody tr:hover {
+  background-color: var(--color-surface-muted);
+}
+
+td button {
+  margin: 0 6px 0 0;
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+  font-size: 14px;
+  color: var(--color-text-muted);
+}
+
+.pagination button {
+  margin: 0;
+}
+
+/* ==========================================================================
+   Loader
+   ========================================================================== */
 
 .loader {
   display: flex;
   align-items: center;
   gap: 12px;
+  padding: 16px 0;
+  color: var(--color-text-muted);
 }
 
 .spinner {
   width: 24px;
   height: 24px;
-  border: 3px solid #ddd;
-  border-top-color: #1976d2;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -62,64 +431,13 @@ td {
   }
 }
 
-.error-text {
-  margin-left: 8px;
-  color: #c62828;
-  font-size: 14px;
-}
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2.4s;
+  }
 
-.message {
-  padding: 8px 12px;
-  border-radius: 4px;
-}
-
-.message.success {
-  background-color: #e8f5e9;
-  color: #2e7d32;
-}
-
-.message.error {
-  background-color: #ffebee;
-  color: #c62828;
-}
-
-.message.info {
-  background-color: #e3f2fd;
-  color: #1565c0;
-}
-
-.auth-page {
-  max-width: 400px;
-}
-
-.auth-page input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 6px;
-}
-
-.app-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #ddd;
-}
-
-.role-badge {
-  margin-left: 6px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-size: 12px;
-  text-transform: uppercase;
-}
-
-.role-admin {
-  background-color: #fff3e0;
-  color: #e65100;
-}
-
-.role-viewer {
-  background-color: #eceff1;
-  color: #455a64;
+  button,
+  input {
+    transition: none;
+  }
 }
