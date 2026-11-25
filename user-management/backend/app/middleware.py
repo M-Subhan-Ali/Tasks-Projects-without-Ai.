@@ -7,6 +7,8 @@ For every request it:
 4. logs one line:  request_id=<id> POST /users 201 12ms
 5. if the route crashes, logs the traceback with the same request ID and
    returns a generic 500, so the error can be traced from the ID alone
+6. stores the ID in request_id_var, so EVERY log line written while handling
+   the request (services, dependencies...) shows the same request_id
 
 Only the method, path and status are logged, never bodies, query strings
 or headers, so passwords and tokens cannot leak into the logs.
@@ -19,6 +21,8 @@ from collections.abc import Awaitable, Callable
 
 from fastapi import Request, Response, status
 from fastapi.responses import JSONResponse
+
+from app.logging_config import request_id_var
 
 logger = logging.getLogger("app.requests")
 
@@ -41,34 +45,35 @@ def resolve_request_id(header_value: str | None) -> str:
 async def request_logging_middleware(request: Request, call_next: CallNext) -> Response:
     request_id = resolve_request_id(request.headers.get(REQUEST_ID_HEADER))
     request.state.request_id = request_id  # available to routes if needed
+    # From here on, every log line written while handling this request
+    # (routes, services, dependencies) carries this ID. See logging_config.py.
+    context_token = request_id_var.set(request_id)
 
     start = time.perf_counter()
 
     try:
-        response = await call_next(request)
-    except Exception:
-        # Unexpected error in a route: full details go to the server log only.
-        logger.exception(
-            "request_id=%s unhandled error on %s %s",
-            request_id,
+        try:
+            response = await call_next(request)
+        except Exception:
+            # Unexpected error in a route: full details go to the server log only.
+            logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+            response = JSONResponse(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                content={"detail": "Internal server error", "request_id": request_id},
+            )
+
+        duration_ms = (time.perf_counter() - start) * 1000
+        response.headers[REQUEST_ID_HEADER] = request_id
+
+        logger.info(
+            "%s %s %d %.0fms",
             request.method,
             request.url.path,
-        )
-        response = JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"detail": "Internal server error", "request_id": request_id},
+            response.status_code,
+            duration_ms,
         )
 
-    duration_ms = (time.perf_counter() - start) * 1000
-    response.headers[REQUEST_ID_HEADER] = request_id
-
-    logger.info(
-        "request_id=%s %s %s %d %.0fms",
-        request_id,
-        request.method,
-        request.url.path,
-        response.status_code,
-        duration_ms,
-    )
-
-    return response
+        return response
+    finally:
+        # Forget the ID, so nothing logged after this request reuses it.
+        request_id_var.reset(context_token)

@@ -4,7 +4,10 @@ import type { ReactNode } from "react";
 import { SESSION_EXPIRED_MESSAGE, setUnauthorizedHandler } from "../services/apiClient";
 import * as authService from "../services/authService";
 import type { Account, AuthStatus, Credentials } from "../types/auth";
+import { createLogger } from "../utils/logger";
 import { AuthContext } from "./AuthContext";
+
+const log = createLogger("auth");
 
 function AuthProvider({ children }: { children: ReactNode }) {
     const [account, setAccount] = useState<Account | null>(null);
@@ -27,6 +30,10 @@ function AuthProvider({ children }: { children: ReactNode }) {
             .getCurrentAccount()
             .then((current) => {
                 if (!isCancelled) {
+                    log.info("Session restored from cookie", {
+                        accountId: current.id,
+                        role: current.role,
+                    });
                     setAccount(current);
                     setStatus("authenticated");
                 }
@@ -34,6 +41,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
             .catch(() => {
                 // 401 (no cookie / expired) or network error: show the login page.
                 if (!isCancelled) {
+                    log.debug("No active session, showing the login page");
                     setStatus("anonymous");
                 }
             });
@@ -48,6 +56,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         setUnauthorizedHandler(() => {
             if (statusRef.current === "authenticated") {
+                log.warn("Session expired (API returned 401), logging out");
                 setAccount(null);
                 setStatus("anonymous");
                 setNotice(SESSION_EXPIRED_MESSAGE);
@@ -60,6 +69,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
     const login = useCallback(async (credentials: Credentials) => {
         // The server sets the httpOnly cookie and returns the account.
         const current = await authService.login(credentials);
+        log.info("Logged in", { accountId: current.id, role: current.role });
         setAccount(current);
         setStatus("authenticated");
         setNotice(undefined);
@@ -69,6 +79,7 @@ function AuthProvider({ children }: { children: ReactNode }) {
         try {
             await authService.logout(); // the server deletes the cookie
         } finally {
+            log.info("Logged out");
             setAccount(null);
             setStatus("anonymous");
             setNotice("You have been logged out.");
