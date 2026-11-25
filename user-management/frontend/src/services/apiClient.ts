@@ -1,4 +1,8 @@
 import type { ApiErrorResponse } from "../types/user";
+import { createLogger } from "../utils/logger";
+
+const log = createLogger("api");
+const REQUEST_ID_HEADER = "X-Request-ID";
 
 // The ONE place that talks to the API: every request goes through request(),
 // which sends the auth cookie and handles 401/403 the same way everywhere.
@@ -70,11 +74,19 @@ async function getResponseErrorMessage(response: Response): Promise<string> {
 
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const headers = new Headers(options.headers);
+    const method = (options.method ?? "GET").toUpperCase();
 
     if (options.body) {
         headers.set("Content-Type", "application/json");
     }
 
+    // Our own ID for this request. The backend reuses any valid UUID it gets in
+    // X-Request-ID, so this same ID appears in the browser console, in the
+    // Network tab and in the backend log: search for it to follow one request.
+    const requestId = crypto.randomUUID();
+    headers.set(REQUEST_ID_HEADER, requestId);
+
+    const startedAt = performance.now();
     let response: Response;
 
     try {
@@ -83,30 +95,44 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
             headers,
             credentials: "include", // send the auth cookie to the API (another port)
         });
-    } catch {
+    } catch (error: unknown) {
+        log.error(`${method} ${path} failed: cannot reach the server`, { requestId, error });
         throw new Error(
-            "Cannot connect to the server. Please make sure the backend is running."
+            "Cannot connect to the server. Please make sure the backend is running.",
+            { cause: error } // keep the original fetch error attached for debugging
         );
+    }
+
+    // Never log request or response bodies: they hold passwords and user data.
+    const summary = `${method} ${path} ${response.status}`;
+    const details = {
+        requestId,
+        durationMs: Math.round(performance.now() - startedAt),
+    };
+
+    if (response.ok) {
+        log.debug(summary, details);
+        return response.status === 204
+            ? (undefined as T)
+            : ((await response.json()) as T);
+    }
+
+    const message =
+        response.status === 403
+            ? FORBIDDEN_MESSAGE
+            : await getResponseErrorMessage(response);
+
+    if (response.status >= 500) {
+        log.error(summary, { ...details, message });
+    } else {
+        log.warn(summary, { ...details, message });
     }
 
     if (response.status === 401) {
         onUnauthorized?.();
-        throw new ApiError(await getResponseErrorMessage(response), 401);
     }
 
-    if (response.status === 403) {
-        throw new ApiError(FORBIDDEN_MESSAGE, 403);
-    }
-
-    if (!response.ok) {
-        throw new ApiError(await getResponseErrorMessage(response), response.status);
-    }
-
-    if (response.status === 204) {
-        return undefined as T;
-    }
-
-    return (await response.json()) as T;
+    throw new ApiError(message, response.status);
 }
 
 export function getErrorMessage(error: unknown): string {
