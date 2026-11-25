@@ -34,7 +34,7 @@ function UserTable({
     canEdit,
 }: UserTableProps) {
     return (
-        <div>
+        <div className="card">
             <h2>User List</h2>
 
             <SearchInput
@@ -43,10 +43,10 @@ function UserTable({
                 onChange={onSearchChange}
             />
 
-            <p>Total Records: {total}</p>
+            <p className="muted">Total Records: {total}</p>
 
             {users.length === 0 ? (
-                <p>
+                <p className="muted">
                     {isSearching
                         ? "No matching users found."
                         : canEdit
@@ -55,49 +55,52 @@ function UserTable({
                 </p>
             ) : (
                 <>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Email</th>
-                                <th>Phone</th>
-                                <th>City</th>
-                                <th>Company</th>
-                                {canEdit && <th>Actions</th>}
-                            </tr>
-                        </thead>
-
-                        <tbody>
-                            {users.map((user) => (
-                                <tr key={user.id}>
-                                    <td>{user.name}</td>
-                                    <td>{user.email}</td>
-                                    <td>{user.phone}</td>
-                                    <td>{user.city ?? "—"}</td>
-                                    <td>{user.company.name}</td>
-                                    {canEdit && (
-                                        <td>
-                                            <button
-                                                onClick={() => onEdit(user)}
-                                                disabled={deletingUserId === user.id}
-                                            >
-                                                Edit
-                                            </button>
-
-                                            <button
-                                                onClick={() => onDelete(user)}
-                                                disabled={deletingUserId === user.id}
-                                            >
-                                                {deletingUserId === user.id
-                                                    ? "Deleting..."
-                                                    : "Delete"}
-                                            </button>
-                                        </td>
-                                    )}
+                    <div className="table-wrap">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Phone</th>
+                                    <th>City</th>
+                                    <th>Company</th>
+                                    {canEdit && <th>Actions</th>}
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+
+                            <tbody>
+                                {users.map((user) => (
+                                    <tr key={user.id}>
+                                        <td>{user.name}</td>
+                                        <td>{user.email}</td>
+                                        <td>{user.phone}</td>
+                                        <td>{user.city ?? "—"}</td>
+                                        <td>{user.company.name}</td>
+                                        {canEdit && (
+                                            <td>
+                                                <button
+                                                    onClick={() => onEdit(user)}
+                                                    disabled={deletingUserId === user.id}
+                                                >
+                                                    Edit
+                                                </button>
+
+                                                <button
+                                                    className="btn-danger"
+                                                    onClick={() => onDelete(user)}
+                                                    disabled={deletingUserId === user.id}
+                                                >
+                                                    {deletingUserId === user.id
+                                                        ? "Deleting..."
+                                                        : "Delete"}
+                                                </button>
+                                            </td>
+                                        )}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
 
                     <Pagination
                         currentPage={page}

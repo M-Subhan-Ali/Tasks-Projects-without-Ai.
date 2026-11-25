@@ -80,7 +80,9 @@ function RegisterPage() {
     return (
         <div className="container auth-page">
             <h1>Create an account</h1>
-            <p>New accounts are viewers: they can see users but not change them.</p>
+            <p className="muted">
+                New accounts are viewers: they can see users but not change them.
+            </p>
 
             {serverError && <p className="message error">{serverError}</p>}
 
@@ -125,7 +127,7 @@ function RegisterPage() {
                     )}
                 </div>
 
-                <button type="submit" disabled={isSubmitting}>
+                <button type="submit" className="btn-primary" disabled={isSubmitting}>
                     {isSubmitting ? "Creating account..." : "Register"}
                 </button>
             </form>

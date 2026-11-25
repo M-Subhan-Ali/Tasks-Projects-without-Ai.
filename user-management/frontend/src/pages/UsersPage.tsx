@@ -124,8 +124,10 @@ function UsersPage() {
             {loadStatus === "success" && (
                 <>
                     {canEdit && (
-                        <div>
-                            <button onClick={handleAdd}>Add User</button>
+                        <div className="toolbar">
+                            <button className="btn-primary" onClick={handleAdd}>
+                                Add User
+                            </button>
                         </div>
                     )}
 
