@@ -1,10 +1,14 @@
 """Database access for users. SQLAlchemy queries live here and nowhere else."""
 
+import logging
+
 from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import User
+
+logger = logging.getLogger(__name__)
 
 
 def search_active_users(
@@ -24,6 +28,15 @@ def search_active_users(
     )
     users = list(db.scalars(page_query).all())
 
+    # DEBUG only (LOG_LEVEL=DEBUG): helps check paging maths while developing.
+    logger.debug(
+        "Searched users search=%r offset=%d limit=%d -> %d of %d",
+        search,
+        offset,
+        limit,
+        len(users),
+        total,
+    )
     return users, total
 
 

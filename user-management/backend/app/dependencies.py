@@ -4,6 +4,7 @@
 403 Forbidden    = we know who you are, but your role may not do this.
 """
 
+import logging
 from collections.abc import Callable
 from typing import Annotated
 
@@ -25,6 +26,8 @@ from app.services import auth_service
 # "Authorize" button to Swagger UI (/docs).
 _bearer_scheme = HTTPBearer(auto_error=False)
 
+logger = logging.getLogger(__name__)
+
 
 def get_current_account(
     request: Request,
@@ -37,6 +40,8 @@ def get_current_account(
         token = credentials.credentials
 
     if not token:
+        # DEBUG, not WARNING: every visit before logging in does this (GET /auth/me).
+        logger.debug("No token in cookie or Authorization header")
         raise NotAuthenticated()
 
     return auth_service.get_account_from_token(db, token)
@@ -55,6 +60,13 @@ def require_role(*allowed_roles: Role) -> Callable[[Account], Account]:
 
     def check_role(account: CurrentAccount) -> Account:
         if account.role not in allowed:
+            # The request log line with the same request_id shows which route.
+            logger.warning(
+                "Permission denied account_id=%s role=%s required=%s",
+                account.id,
+                account.role,
+                sorted(allowed),
+            )
             raise PermissionDenied()
         return account
 

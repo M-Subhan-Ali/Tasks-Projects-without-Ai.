@@ -4,6 +4,7 @@ This layer knows nothing about HTTP: it never imports FastAPI and never raises
 HTTPException. It raises application exceptions from app.exceptions instead.
 """
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -15,6 +16,9 @@ from app.exceptions import EmailAlreadyExists, UserNotFound
 from app.models import User
 from app.repositories import user_repository
 from app.schemas import UserCreate, UserUpdate
+
+# Log IDs and field NAMES only, never the values (names, emails, phones).
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -49,10 +53,13 @@ def create_user(db: Session, user_data: UserCreate) -> User:
     user = User(**_to_column_values(user_data.model_dump()))
 
     try:
-        return user_repository.add_user(db, user)
+        user = user_repository.add_user(db, user)
     except IntegrityError as error:
         _raise_if_duplicate_email(error, user_data.email)
         raise
+
+    logger.info("User created user_id=%s", user.id)
+    return user
 
 
 def replace_user(db: Session, user_id: int, user_data: UserCreate) -> User:
@@ -72,6 +79,7 @@ def delete_user(db: Session, user_id: int) -> None:
     user.deleted_at = datetime.now(timezone.utc)
 
     user_repository.save_user(db, user)
+    logger.info("User soft-deleted user_id=%s", user_id)
 
 
 def _apply_changes(db: Session, user_id: int, changes: dict[str, Any]) -> User:
@@ -85,10 +93,13 @@ def _apply_changes(db: Session, user_id: int, changes: dict[str, Any]) -> User:
         setattr(user, column, value)
 
     try:
-        return user_repository.save_user(db, user)
+        user = user_repository.save_user(db, user)
     except IntegrityError as error:
         _raise_if_duplicate_email(error, new_email or user.email)
         raise
+
+    logger.info("User updated user_id=%s fields=%s", user_id, sorted(changes))
+    return user
 
 
 def _to_column_values(data: dict[str, Any]) -> dict[str, Any]:
@@ -105,6 +116,7 @@ def _ensure_email_available(
     db: Session, email: str, exclude_user_id: int | None = None
 ) -> None:
     if user_repository.email_exists(db, email, exclude_user_id):
+        logger.info("Rejected: email already used by another user")
         raise EmailAlreadyExists(email)
 
 
@@ -116,4 +128,5 @@ def _raise_if_duplicate_email(error: IntegrityError, email: str) -> None:
     integrity error is unexpected, so the caller re-raises it (500).
     """
     if "users.email" in str(error.orig):
+        logger.warning("Duplicate email caught by the database UNIQUE constraint (race)")
         raise EmailAlreadyExists(email) from error
