@@ -50,7 +50,12 @@ def get_active_user_by_id(db: Session, user_id: int) -> User | None:
 
 
 def email_exists(db: Session, email: str, exclude_user_id: int | None = None) -> bool:
-    query = select(User.id).where(func.lower(User.email) == email.lower())
+    """True if an ACTIVE user has this email. Deleted users' emails are free to reuse,
+    matching the partial unique index uq_users_email_active."""
+    query = select(User.id).where(
+        func.lower(User.email) == email.lower(),
+        User.is_deleted.is_(False),
+    )
 
     if exclude_user_id is not None:
         query = query.where(User.id != exclude_user_id)

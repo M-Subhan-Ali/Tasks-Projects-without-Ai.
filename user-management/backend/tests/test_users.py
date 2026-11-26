@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import User
@@ -219,3 +220,144 @@ def test_invalid_client_request_id_is_replaced(admin_client: TestClient) -> None
     returned_id = response.headers["X-Request-ID"]
     assert returned_id != "not-a-uuid"
     uuid.UUID(returned_id)  # raises if it is not a valid UUID
+
+
+# --- Reusing the email of a deleted user ----------------------------------------
+# Emails are unique among ACTIVE users only (partial unique index
+# uq_users_email_active, migration 0005).
+
+
+def test_deleted_users_email_can_be_reused(admin_client: TestClient, create_user: CreateUser) -> None:
+    # 1. Create a user: 201.
+    original = create_user(email="reuse@example.com")
+
+    # 2. Soft-delete that user: 204, and it is hidden.
+    assert admin_client.delete(f"/users/{original['id']}").status_code == 204
+    assert admin_client.get(f"/users/{original['id']}").status_code == 404
+
+    # 3. Reuse the deleted user's email: 201, and it is a NEW user.
+    response = admin_client.post("/users", json=user_payload(name="New Owner", email="reuse@example.com"))
+
+    assert response.status_code == 201
+    reused = response.json()
+    assert reused["id"] != original["id"]
+    assert reused["email"] == "reuse@example.com"
+    listed = admin_client.get("/users").json()
+    assert [user["id"] for user in listed["items"]] == [reused["id"]]
+
+
+def test_active_users_email_still_returns_409_after_reuse(
+    admin_client: TestClient, create_user: CreateUser
+) -> None:
+    deleted = create_user(email="taken.again@example.com")
+    admin_client.delete(f"/users/{deleted['id']}")
+    create_user(email="taken.again@example.com")  # the active owner now
+
+    # 4. Duplicate an ACTIVE user's email: still 409.
+    response = admin_client.post("/users", json=user_payload(email="taken.again@example.com"))
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "This email already exists"
+
+
+def test_reuse_ignores_case(admin_client: TestClient, create_user: CreateUser) -> None:
+    user = create_user(email="mixed@example.com")
+    admin_client.delete(f"/users/{user['id']}")
+
+    response = admin_client.post("/users", json=user_payload(email="MIXED@Example.com"))
+
+    assert response.status_code == 201
+    assert response.json()["email"] == "mixed@example.com"
+
+
+def test_email_can_be_reused_more_than_once(admin_client: TestClient, create_user: CreateUser) -> None:
+    for _ in range(3):
+        user = create_user(email="many.times@example.com")
+        assert admin_client.delete(f"/users/{user['id']}").status_code == 204
+
+    assert admin_client.post("/users", json=user_payload(email="many.times@example.com")).status_code == 201
+
+
+def test_update_can_take_a_deleted_users_email(admin_client: TestClient, create_user: CreateUser) -> None:
+    deleted = create_user(email="old.owner@example.com")
+    admin_client.delete(f"/users/{deleted['id']}")
+    other = create_user(email="other.owner@example.com")
+
+    patch = admin_client.patch(f"/users/{other['id']}", json={"email": "old.owner@example.com"})
+    assert patch.status_code == 200
+    assert patch.json()["email"] == "old.owner@example.com"
+
+    # PUT gets the same rule.
+    third = create_user(email="third@example.com")
+    put = admin_client.put(f"/users/{third['id']}", json=user_payload(email="other.owner@example.com"))
+    assert put.status_code == 200
+
+
+def test_update_to_an_active_users_email_still_returns_409(
+    admin_client: TestClient, create_user: CreateUser
+) -> None:
+    create_user(email="active.one@example.com")
+    second = create_user(email="active.two@example.com")
+
+    response = admin_client.put(f"/users/{second['id']}", json=user_payload(email="active.one@example.com"))
+
+    assert response.status_code == 409
+
+
+def test_reuse_race_is_allowed_when_only_a_deleted_user_has_the_email(
+    admin_client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """With the service check skipped, only the database decides: a deleted
+    row with the same email must NOT block the insert."""
+    db_session.add(
+        User(name="Gone", email="race.reuse@example.com", phone="0321-1234567",
+             company_name="X", is_deleted=True)
+    )
+    db_session.commit()
+    monkeypatch.setattr(user_repository, "email_exists", lambda *args, **kwargs: False)
+
+    response = admin_client.post("/users", json=user_payload(email="race.reuse@example.com"))
+
+    assert response.status_code == 201
+
+
+# --- The partial unique index itself (no API, straight to the database) ---------
+
+
+def _user_row(email: str, is_deleted: bool) -> User:
+    return User(name="Row", email=email, phone="0321-1234567", company_name="X", is_deleted=is_deleted)
+
+
+def test_index_allows_deleted_and_active_rows_with_same_email(db_session: Session) -> None:
+    db_session.add_all([
+        _user_row("shared@example.com", is_deleted=True),
+        _user_row("shared@example.com", is_deleted=True),
+        _user_row("shared@example.com", is_deleted=False),
+    ])
+    db_session.commit()  # does not raise
+
+    assert db_session.query(User).filter_by(email="shared@example.com").count() == 3
+
+
+def test_index_rejects_two_active_rows_with_same_email(db_session: Session) -> None:
+    db_session.add(_user_row("dup@example.com", is_deleted=False))
+    db_session.commit()
+
+    db_session.add(_user_row("dup@example.com", is_deleted=False))
+    with pytest.raises(IntegrityError, match="users.email"):
+        db_session.commit()
+    db_session.rollback()
+
+
+def test_index_rejects_restoring_a_deleted_user_whose_email_was_taken(db_session: Session) -> None:
+    """Un-deleting a row would make two ACTIVE users share an email: refused."""
+    deleted = _user_row("restore@example.com", is_deleted=True)
+    db_session.add_all([deleted, _user_row("restore@example.com", is_deleted=False)])
+    db_session.commit()
+
+    deleted.is_deleted = False
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+    db_session.rollback()

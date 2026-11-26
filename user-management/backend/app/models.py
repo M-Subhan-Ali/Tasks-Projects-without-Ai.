@@ -7,10 +7,12 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     String,
     UniqueConstraint,
     false,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -30,12 +32,29 @@ class WebhookEvent(StrEnum):
     USER_DELETED = "user.deleted"
 
 
+# Emails must be unique among ACTIVE users only. A partial unique index covers
+# just the rows that match its WHERE clause, so soft-deleted rows
+# (is_deleted = 1) are skipped and their email can be used again.
+# SQLite stores booleans as 0/1.
+ACTIVE_USER_EMAIL_INDEX = "uq_users_email_active"
+
+
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        Index(
+            ACTIVE_USER_EMAIL_INDEX,
+            "email",
+            unique=True,
+            sqlite_where=text("is_deleted = 0"),
+            postgresql_where=text("is_deleted = false"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100))
-    email: Mapped[str] = mapped_column(String(100), unique=True)
+    # Not unique=True: that would also block the emails of deleted users.
+    email: Mapped[str] = mapped_column(String(100))
     phone: Mapped[str] = mapped_column(String(50))
     city: Mapped[str | None] = mapped_column(String(100), nullable=True)
     company_name: Mapped[str] = mapped_column(String(100))
