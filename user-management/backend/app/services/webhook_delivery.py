@@ -18,6 +18,10 @@ What a receiver gets:
 Signature = HMAC-SHA256(key=secret, message="<X-Webhook-Timestamp>.<raw body>").
 The timestamp is part of the signed message, so an attacker who captured a
 request can't resend it later with a fresh timestamp: the signature would break.
+
+SSRF: the HTTP client comes from safe_http, which checks the IP of every
+connection it opens. A blocked destination is saved as a failed attempt
+("Blocked: ...") and is not retried: the answer would be the same.
 """
 
 import hashlib
@@ -32,6 +36,7 @@ from typing import Any
 import httpx2
 from sqlalchemy.orm import Session, sessionmaker
 
+from app import config, safe_http, url_safety
 from app.models import WebhookDelivery, WebhookSubscription
 from app.repositories import webhook_repository
 
@@ -49,6 +54,7 @@ MAX_RETRIES = 3  # 1 first attempt + up to 3 retries = at most 4 attempts
 # to recover instead of hammering it. Tests set these to 0.
 RETRY_DELAYS_SECONDS: tuple[float, ...] = (1, 2, 4)
 MAX_ERROR_LENGTH = 500  # the size of webhook_deliveries.error
+BLOCKED_PREFIX = "Blocked: "  # error text of an attempt refused by the SSRF guard
 
 
 def sign(secret: str, timestamp: str, body: bytes) -> str:
@@ -67,9 +73,10 @@ def build_payload(event: str, user: dict[str, Any], event_id: str, occurred_at: 
 
 
 def create_http_client() -> httpx2.Client:
-    # follow_redirects=False (the default): a receiver can't bounce our signed
-    # request to some other address.
-    return httpx2.Client(timeout=TIMEOUT_SECONDS)
+    # Checks the IP of every connection (SSRF) and never follows redirects, so
+    # a receiver can't bounce our signed request to some other address.
+    # config.ALLOW_LOCAL_WEBHOOKS is read on every delivery, not once at import.
+    return safe_http.create_guarded_client(TIMEOUT_SECONDS, config.ALLOW_LOCAL_WEBHOOKS)
 
 
 def deliver_event(session_factory: sessionmaker[Session], event: str, user: dict[str, Any]) -> None:
@@ -115,6 +122,9 @@ def _deliver_with_retries(
             "Webhook delivery failed webhook_id=%s event=%s attempt=%d error=%s",
             subscription.id, event, attempt, delivery.error,
         )
+        if delivery.error is not None and delivery.error.startswith(BLOCKED_PREFIX):
+            # Retrying can't help: the destination is not allowed.
+            return
         if attempt <= MAX_RETRIES:
             time.sleep(RETRY_DELAYS_SECONDS[attempt - 1])
 
@@ -150,6 +160,9 @@ def _attempt(
         status_code = response.status_code
         if not response.is_success:
             error = f"HTTP {status_code}"
+    except url_safety.UnsafeDestination as exc:
+        # Refused by safe_http before any connection was opened.
+        error = f"{BLOCKED_PREFIX}{exc}"[:MAX_ERROR_LENGTH]
     except (httpx2.HTTPError, httpx2.InvalidURL) as exc:
         # Timeout, connection refused, DNS failure...: no response at all.
         error = f"{type(exc).__name__}: {exc}"[:MAX_ERROR_LENGTH]

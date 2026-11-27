@@ -13,6 +13,7 @@ from pydantic import (
     field_validator,
 )
 
+from app import config, url_safety
 from app.models import User, WebhookEvent
 
 NAME_PATTERN = r"^[A-Za-z\s.'-]+$"
@@ -180,6 +181,16 @@ class WebhookCreate(BaseModel):
     def remove_duplicates(cls, events: list[WebhookEvent]) -> list[WebhookEvent]:
         # ["user.created", "user.created"] would otherwise send every event twice.
         return list(dict.fromkeys(events))
+
+    @field_validator("url")
+    @classmethod
+    def reject_internal_host(cls, url: HttpUrl) -> HttpUrl:
+        # SSRF, first check (no DNS): IP literals and localhost names. Pydantic
+        # has already normalised the host, so tricks like http://2130706433/ or
+        # http://0x7f.1/ arrive here as 127.0.0.1. Hostnames are resolved and
+        # checked by webhook_service, and again on every delivery.
+        url_safety.check_host(url.host or "", config.ALLOW_LOCAL_WEBHOOKS)
+        return url
 
 
 class WebhookResponse(BaseModel):

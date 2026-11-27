@@ -5,7 +5,8 @@ import secrets
 
 from sqlalchemy.orm import Session
 
-from app.exceptions import WebhookNotFound
+from app import config, url_safety
+from app.exceptions import UnsafeWebhookUrl, WebhookNotFound
 from app.models import WebhookDelivery, WebhookSubscription
 from app.repositories import webhook_repository
 from app.schemas import WebhookCreate
@@ -23,6 +24,16 @@ def generate_secret() -> str:
 
 
 def create_subscription(db: Session, data: WebhookCreate) -> WebhookSubscription:
+    # SSRF, second check: a hostname may resolve to an internal address
+    # (internal.example.com -> 10.0.0.5). Refusing it here gives the admin a
+    # clear 422 now. It does NOT make delivery safe on its own: DNS can change
+    # later, so safe_http checks the address again on every connection.
+    try:
+        url_safety.resolve_safe(data.url.host or "", data.url.port or 0, config.ALLOW_LOCAL_WEBHOOKS)
+    except url_safety.UnsafeDestination as error:
+        logger.warning("Webhook registration refused: unsafe destination")
+        raise UnsafeWebhookUrl(str(error)) from error
+
     subscription = WebhookSubscription(
         url=str(data.url),
         events=[event.value for event in data.events],

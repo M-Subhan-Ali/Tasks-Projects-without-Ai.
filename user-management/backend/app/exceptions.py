@@ -3,7 +3,12 @@ class AppError(Exception):
 
     Services raise these instead of HTTPException, so they stay independent of
     FastAPI. main.py turns them into HTTP responses in one place.
+
+    A subclass that sets `field` is reported in the 422 validation format,
+    {"detail": "Validation failed", "errors": [{"field": ..., "message": ...}]}.
     """
+
+    field: str | None = None
 
     def __init__(self, message: str) -> None:
         super().__init__(message)
@@ -20,6 +25,19 @@ class WebhookNotFound(AppError):
     def __init__(self, webhook_id: int) -> None:
         super().__init__("Webhook not found")
         self.webhook_id = webhook_id
+
+
+class UnsafeWebhookUrl(AppError):
+    """The webhook URL's host resolves to an address webhooks may not go to.
+
+    Reported like a validation error (422 with the field), because it is one;
+    the service raises it because the check needs a DNS lookup.
+    """
+
+    field = "url"
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(f"Webhook URL is not allowed: {reason}")
 
 
 class EmailAlreadyExists(AppError):

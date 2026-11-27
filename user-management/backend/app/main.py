@@ -13,6 +13,7 @@ from app.exceptions import (
     InvalidCredentials,
     NotAuthenticated,
     PermissionDenied,
+    UnsafeWebhookUrl,
     UserNotFound,
     WebhookNotFound,
 )
@@ -54,6 +55,7 @@ APP_ERROR_STATUS_CODES: dict[type[AppError], int] = {
     InvalidCredentials: status.HTTP_401_UNAUTHORIZED,
     NotAuthenticated: status.HTTP_401_UNAUTHORIZED,
     PermissionDenied: status.HTTP_403_FORBIDDEN,
+    UnsafeWebhookUrl: status.HTTP_422_UNPROCESSABLE_CONTENT,
 }
 
 
@@ -68,9 +70,14 @@ def app_error_handler(request: Request, error: AppError) -> JSONResponse:
         if status_code == status.HTTP_401_UNAUTHORIZED
         else None
     )
-    return JSONResponse(
-        status_code=status_code, content={"detail": error.message}, headers=headers
+    # An error about one field gets the same shape as Pydantic's 422s, so
+    # clients show it the same way.
+    content: dict[str, object] = (
+        {"detail": "Validation failed", "errors": [{"field": error.field, "message": error.message}]}
+        if error.field is not None
+        else {"detail": error.message}
     )
+    return JSONResponse(status_code=status_code, content=content, headers=headers)
 
 
 def _format_validation_error(error: dict) -> dict[str, str]:
