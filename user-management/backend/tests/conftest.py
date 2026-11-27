@@ -5,13 +5,21 @@ The real users.db is never used:
   imported (load_dotenv does not override a variable that is already set);
 - get_db is overridden so every request uses the test session;
 - a session-level guard fails the run if users.db is modified.
+
+No test does a real DNS lookup either: the autouse `fake_dns` fixture answers
+for url_safety.resolve().
 """
 
 import os
 
 os.environ["DATABASE_URL"] = "sqlite://"
 os.environ["JWT_SECRET"] = "test-secret-that-is-at-least-32-characters-long"
+# The safe default, whatever your own .env says. Tests that need localhost
+# allowed switch it on with monkeypatch.
+os.environ["ALLOW_LOCAL_WEBHOOKS"] = "false"
 
+import ipaddress  # noqa: E402
+import socket  # noqa: E402
 from collections.abc import Generator, Iterator  # noqa: E402
 from pathlib import Path  # noqa: E402
 from typing import Any  # noqa: E402
@@ -22,11 +30,12 @@ from sqlalchemy import Engine, create_engine  # noqa: E402
 from sqlalchemy.orm import Session, sessionmaker  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
+from app import url_safety  # noqa: E402
 from app.database import Base, get_db, get_session_factory  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import Account, Role  # noqa: E402
 from app.security import create_access_token  # noqa: E402
-from tests.factories import user_payload  # noqa: E402
+from tests.factories import PUBLIC_IP, user_payload  # noqa: E402
 
 REAL_DB_PATH = Path(__file__).resolve().parents[1] / "users.db"
 
@@ -38,6 +47,26 @@ def real_database_is_untouched() -> Iterator[None]:
     yield
     after = REAL_DB_PATH.stat().st_mtime if REAL_DB_PATH.exists() else None
     assert before == after, "Tests modified the real users.db"
+
+
+@pytest.fixture(autouse=True)
+def fake_dns(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[str]]:
+    """Hostname -> IP addresses. Tests may add or change entries.
+
+    Unknown hostnames fail like a real "no such host" DNS error.
+    """
+    records: dict[str, list[str]] = {
+        "receiver.test": [PUBLIC_IP],
+        "localhost": ["::1", "127.0.0.1"],
+    }
+
+    def resolve(host: str, port: int) -> list[url_safety.IPAddress]:
+        if host not in records:
+            raise socket.gaierror(socket.EAI_NONAME, "Name or service not known")
+        return [ipaddress.ip_address(address) for address in records[host]]
+
+    monkeypatch.setattr(url_safety, "resolve", resolve)
+    return records
 
 
 @pytest.fixture

@@ -57,3 +57,10 @@ AUTH_COOKIE_NAME = "access_token"
 # this works in development too; set COOKIE_SECURE=false only if your browser
 # refuses the cookie on plain http.
 COOKIE_SECURE = _read_bool("COOKIE_SECURE", default=True)
+
+# Webhooks may never go to private or link-local addresses (SSRF, see
+# url_safety.py). true also allows localhost / 127.0.0.0/8 / ::1, so the demo
+# receiver on localhost:9000 works. Local development only: keep it false
+# anywhere else. Read as config.ALLOW_LOCAL_WEBHOOKS (not imported by name),
+# so tests can change it.
+ALLOW_LOCAL_WEBHOOKS = _read_bool("ALLOW_LOCAL_WEBHOOKS", default=False)

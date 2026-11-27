@@ -7,3 +7,5 @@ alembic==1.20.1
 argon2-cffi==25.1.0
 PyJWT==2.15.1
 httpx2==2.16.2
+# Installed with httpx2; listed because app/safe_http.py imports it directly.
+httpcore2==2.16.2
